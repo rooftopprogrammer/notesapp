@@ -248,21 +248,21 @@ export default function HomeTracker() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-0 sm:h-16 gap-4">
             <div className="flex items-center gap-4">
               <Link 
                 href="/" 
-                className="text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300"
+                className="text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 text-sm sm:text-base"
               >
                 ← Back to Home
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
                 🏠 Home Tracker
               </h1>
             </div>
             <button
               onClick={handleAdd}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
+              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2 text-sm sm:text-base"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -276,25 +276,25 @@ export default function HomeTracker() {
       {/* Category Navigation Buttons */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 py-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 py-4 sm:py-6">
             {TRACKER_CATEGORIES.map(category => {
               const count = entries.filter(entry => entry.category === category.id).length;
               return (
                 <Link
                   key={category.id}
                   href={`/hometracker/${category.id}`}
-                  className={`flex flex-col items-center p-6 rounded-lg border-2 transition-all hover:shadow-md ${
+                  className={`flex flex-col items-center p-4 sm:p-6 rounded-lg border-2 transition-all hover:shadow-md ${
                     'border-gray-200 dark:border-gray-600 hover:border-teal-300 dark:hover:border-teal-500 bg-white dark:bg-gray-800'
                   }`}
                 >
-                  <div className="text-4xl mb-3">{category.icon}</div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                  <div className="text-2xl sm:text-4xl mb-2 sm:mb-3">{category.icon}</div>
+                  <h3 className="text-sm sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 text-center">
                     {category.name}
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2 text-center">
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-2 text-center hidden sm:block">
                     {category.examples.slice(0, 2).join(', ')}...
                   </p>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${category.color}`}>
+                  <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${category.color}`}>
                     {count} entries
                   </span>
                 </Link>

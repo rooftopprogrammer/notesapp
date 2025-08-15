@@ -211,26 +211,27 @@ export default function VaccinesTracker() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-0 sm:h-16 gap-4">
             <div className="flex items-center gap-4">
               <Link 
                 href="/hometracker" 
-                className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
+                className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm sm:text-base"
               >
                 ← Back to Home Tracker
               </Link>
-              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 {CATEGORY_INFO.icon} {CATEGORY_INFO.name} Tracker
               </h1>
             </div>
             <button
               onClick={handleAdd}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md transition-colors flex items-center gap-2 text-sm sm:text-base whitespace-nowrap"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Add Vaccine Entry
+              <span className="hidden sm:inline">Add Vaccine Entry</span>
+              <span className="sm:hidden">Add Entry</span>
             </button>
           </div>
         </div>
