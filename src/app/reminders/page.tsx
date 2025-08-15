@@ -29,6 +29,9 @@ interface Reminder {
 export default function Reminders() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
@@ -96,16 +99,20 @@ export default function Reminders() {
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this reminder?')) {
       try {
+        setDeleting(id);
         await deleteDoc(doc(db, 'reminders', id));
       } catch (error) {
         console.error('Error deleting reminder:', error);
         alert('Error deleting reminder. Please try again.');
+      } finally {
+        setDeleting(null);
       }
     }
   };
 
   const handleComplete = async (id: string, isCompleted: boolean) => {
     try {
+      setUpdating(id);
       await updateDoc(doc(db, 'reminders', id), {
         isCompleted: !isCompleted,
         updatedAt: serverTimestamp()
@@ -113,6 +120,8 @@ export default function Reminders() {
     } catch (error) {
       console.error('Error updating reminder:', error);
       alert('Error updating reminder. Please try again.');
+    } finally {
+      setUpdating(null);
     }
   };
 
@@ -125,6 +134,7 @@ export default function Reminders() {
     }
 
     try {
+      setSaving(true);
       const reminderTimeDate = new Date(formData.reminderTime);
       
       if (editingReminder) {
@@ -164,6 +174,8 @@ export default function Reminders() {
     } catch (error) {
       console.error('Error saving reminder:', error);
       alert('Error saving reminder. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -276,17 +288,20 @@ export default function Reminders() {
                           <div className="flex items-center gap-3 mb-2">
                             <button
                               onClick={() => handleComplete(reminder.id, reminder.isCompleted)}
+                              disabled={updating === reminder.id}
                               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                                 reminder.isCompleted
                                   ? 'bg-green-500 border-green-500 text-white'
                                   : 'border-gray-300 hover:border-green-400'
-                              }`}
+                              } ${updating === reminder.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                              {reminder.isCompleted && (
+                              {updating === reminder.id ? (
+                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                              ) : reminder.isCompleted ? (
                                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>
-                              )}
+                              ) : null}
                             </button>
                             <h3 className={`text-lg font-medium ${
                               reminder.isCompleted 
@@ -422,8 +437,12 @@ export default function Reminders() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-md transition-colors flex items-center justify-center gap-2"
                 >
+                  {saving && (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  )}
                   {editingReminder ? 'Update' : 'Add'} Reminder
                 </button>
               </div>

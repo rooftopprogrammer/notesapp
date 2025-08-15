@@ -11,5 +11,15 @@ service cloud.firestore {
     match /reminders/{document} {
       allow read, write: if true;
     }
+    
+    // Allow read and write access to the notes collection
+    match /notes/{document} {
+      allow read, write: if true;
+    }
+    
+    // Allow read and write access to the todos collection
+    match /todos/{document} {
+      allow read, write: if true;
+    }
   }
 }
