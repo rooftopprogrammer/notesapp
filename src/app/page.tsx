@@ -68,9 +68,19 @@ export default function Home() {
               </svg>
               Todos
             </Link>
+            
+            <Link
+              href="/hometracker"
+              className="inline-flex items-center justify-center px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-colors gap-3 shadow-lg hover:shadow-xl"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Home Tracker
+            </Link>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 max-w-7xl mx-auto mt-12">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -132,6 +142,22 @@ export default function Home() {
               </div>
               <p className="text-gray-600 dark:text-gray-300">
                 Organize your tasks with priorities, categories, and due dates for maximum productivity.
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Home Tracker
+                </h3>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300">
+                Track your health, fitness, medications, vaccines, and food intake all in one place.
               </p>
             </div>
           </div>
