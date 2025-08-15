@@ -2,11 +2,16 @@
   "name": "rnotes",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "export": "next build",
+    "deploy": "firebase deploy",
+    "serve": "firebase serve",
+    "status": "node scripts/status-check.js"
   },
   "dependencies": {
     "firebase": "^12.1.0",
