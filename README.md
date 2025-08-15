@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RNotes - Progressive Web App
 
-## Getting Started
+A modern note-taking application built with Next.js 15, Firebase, and Progressive Web App capabilities.
 
-First, run the development server:
+## 🚀 Features
+
+- **Next.js 15** with App Router
+- **TypeScript** for type safety
+- **Tailwind CSS** for styling
+- **Firebase** integration ready
+- **Progressive Web App** (PWA) support
+- **Authentication** context setup
+- **Responsive design**
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have:
+
+- Node.js 18+ installed
+- A Firebase project setup
+- Basic knowledge of React and Next.js
+
+## 🛠️ Setup Instructions
+
+### 1. Install Dependencies
+
+Dependencies are already installed during project creation.
+
+### 2. Configure Firebase
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project or use an existing one
+3. Get your Firebase configuration from Project Settings
+4. Update `src/lib/firebase.ts` with your Firebase config:
+
+```typescript
+const firebaseConfig = {
+  apiKey: "your-api-key",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "your-app-id"
+};
+```
+
+### 3. Add PWA Icons
+
+Add the following icon files to the `public` folder:
+- `icon-192x192.png`
+- `icon-256x256.png`
+- `icon-384x384.png`
+- `icon-512x512.png`
+
+### 4. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🏗️ Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+rnotes/
+├── public/                 # Static assets and PWA files
+├── src/
+│   ├── app/               # Next.js app directory
+│   ├── contexts/          # React contexts
+│   └── lib/               # Firebase configuration
+└── package.json           # Dependencies and scripts
+```
 
-## Learn More
+## 📱 PWA Features
 
-To learn more about Next.js, take a look at the following resources:
+- **Offline support** via service worker
+- **Install prompt** for mobile/desktop
+- **Responsive design** for all devices
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🚀 Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Deploy easily on [Vercel](https://vercel.com/new) or Firebase Hosting.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Check out the [deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
