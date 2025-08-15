@@ -13,6 +13,9 @@
     "serve": "firebase serve",
     "status": "node scripts/status-check.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "firebase": "^12.1.0",
     "next": "15.4.6",
