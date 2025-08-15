@@ -6,5 +6,10 @@ service cloud.firestore {
     match /productionApps/{document} {
       allow read, write: if true;
     }
+    
+    // Allow read and write access to the reminders collection
+    match /reminders/{document} {
+      allow read, write: if true;
+    }
   }
 }
