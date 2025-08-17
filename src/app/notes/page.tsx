@@ -17,7 +17,7 @@ interface Note {
   id: string;
   title: string;
   content: string;
-  noteType: 'paragraph' | 'bullet' | 'numbered';
+  noteType: 'paragraph' | 'bullet' | 'numbered' | 'link';
   topic: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -44,7 +44,7 @@ export default function Notes() {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    noteType: 'paragraph' as 'paragraph' | 'bullet' | 'numbered',
+    noteType: 'paragraph' as 'paragraph' | 'bullet' | 'numbered' | 'link',
     topic: 'youtube'
   });
 
@@ -182,6 +182,39 @@ export default function Notes() {
           <span>{line}</span>
         </div>
       ));
+    } else if (noteType === 'link') {
+      return content.split('\n').map((line, index) => {
+        // Check if the line contains a valid URL
+        const urlPattern = /^(https?:\/\/[^\s]+)(.*)$/;
+        const match = line.match(urlPattern);
+        
+        if (match) {
+          const [, url, description] = match;
+          const displayText = description.trim() || url;
+          return (
+            <div key={index} className="flex items-start gap-2 mb-2">
+              <span className="text-blue-500 mt-1">🔗</span>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline break-all"
+                title={url}
+              >
+                {displayText}
+              </a>
+            </div>
+          );
+        } else {
+          // If it's not a URL, treat it as a regular line
+          return (
+            <div key={index} className="flex items-start gap-2 mb-1">
+              <span className="text-gray-500 mt-1">📝</span>
+              <span>{line}</span>
+            </div>
+          );
+        }
+      });
     }
     return content.split('\n').map((line, index) => (
       <p key={index} className="mb-1">{line}</p>
@@ -410,13 +443,14 @@ export default function Notes() {
                   <select
                     id="noteType"
                     value={formData.noteType}
-                    onChange={(e) => setFormData({ ...formData, noteType: e.target.value as 'paragraph' | 'bullet' | 'numbered' })}
+                    onChange={(e) => setFormData({ ...formData, noteType: e.target.value as 'paragraph' | 'bullet' | 'numbered' | 'link' })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-gray-100"
                     required
                   >
                     <option value="paragraph">Paragraph</option>
                     <option value="bullet">Bullet Points</option>
                     <option value="numbered">Numbered List</option>
+                    <option value="link">Links</option>
                   </select>
                 </div>
               </div>
@@ -433,12 +467,24 @@ export default function Notes() {
                   placeholder={
                     formData.noteType === 'bullet' ? 'Enter each bullet point on a new line' :
                     formData.noteType === 'numbered' ? 'Enter each item on a new line' :
+                    formData.noteType === 'link' ? 'Enter each link on a new line (e.g., https://example.com Optional description)' :
                     'Enter your note content'
                   }
                   rows={8}
                   required
                 />
-                {formData.noteType !== 'paragraph' && (
+                {formData.noteType === 'link' && (
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 font-medium mb-1">Link Format Examples:</p>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">https://example.com</p>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">https://example.com My favorite website</p>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">https://github.com/user/repo GitHub Repository</p>
+                    <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">
+                      💡 Each line should contain a URL. You can add a description after the URL (separated by space).
+                    </p>
+                  </div>
+                )}
+                {formData.noteType !== 'paragraph' && formData.noteType !== 'link' && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     Tip: Each line will be formatted as a separate {formData.noteType === 'bullet' ? 'bullet point' : 'numbered item'}
                   </p>
