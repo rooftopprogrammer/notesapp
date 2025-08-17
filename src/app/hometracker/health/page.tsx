@@ -217,7 +217,7 @@ export default function HealthTracker() {
                 href="/hometracker" 
                 className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
               >
-                ← Back to Home Tracker
+                ← Back to Family Tracker
               </Link>
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 {CATEGORY_INFO.icon} {CATEGORY_INFO.name} Tracker

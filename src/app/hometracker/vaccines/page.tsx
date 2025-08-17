@@ -217,7 +217,7 @@ export default function VaccinesTracker() {
                 href="/hometracker" 
                 className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm sm:text-base"
               >
-                ← Back to Home Tracker
+                ← Back to Family Tracker
               </Link>
               <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 {CATEGORY_INFO.icon} {CATEGORY_INFO.name} Tracker

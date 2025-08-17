@@ -217,7 +217,7 @@ export default function FitnessTracker() {
                 href="/hometracker" 
                 className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
               >
-                ← Back to Home Tracker
+                ← Back to Family Tracker
               </Link>
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 {CATEGORY_INFO.icon} {CATEGORY_INFO.name} Tracker

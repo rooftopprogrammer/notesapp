@@ -217,7 +217,7 @@ export default function FoodTracker() {
                 href="/hometracker" 
                 className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
               >
-                ← Back to Home Tracker
+                ← Back to Family Tracker
               </Link>
               <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 {CATEGORY_INFO.icon} {CATEGORY_INFO.name} Tracker
