@@ -31,5 +31,15 @@ service cloud.firestore {
     match /businessUsers/{document} {
       allow read, write: if true;
     }
+    
+    // Allow read and write access to the businessProjects collection
+    match /businessProjects/{document} {
+      allow read, write: if true;
+    }
+    
+    // Allow read and write access to the businessCredentials collection
+    match /businessCredentials/{document} {
+      allow read, write: if true;
+    }
   }
 }

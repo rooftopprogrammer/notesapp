@@ -2,7 +2,7 @@ import withPWA from "next-pwa";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  // Removed output: 'export' since we're using dynamic features
   trailingSlash: true,
   images: {
     unoptimized: true
