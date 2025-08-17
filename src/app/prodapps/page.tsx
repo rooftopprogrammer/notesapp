@@ -12,6 +12,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface ProductionApp {
   id: string;
@@ -29,6 +30,15 @@ export default function ProductionApps() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<ProductionApp | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    appId: string;
+    appName: string;
+  }>({
+    isOpen: false,
+    appId: '',
+    appName: ''
+  });
   const [formData, setFormData] = useState({
     name: '',
     link: ''
@@ -75,18 +85,29 @@ export default function ProductionApps() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this application?')) {
-      try {
-        setDeleting(id);
-        await deleteDoc(doc(db, 'productionApps', id));
-      } catch (error) {
-        console.error('Error deleting app:', error);
-        alert('Error deleting application. Please try again.');
-      } finally {
-        setDeleting(null);
-      }
+  const handleDelete = (id: string, name: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      appId: id,
+      appName: name
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleting(confirmDialog.appId);
+      await deleteDoc(doc(db, 'productionApps', confirmDialog.appId));
+      setConfirmDialog({ isOpen: false, appId: '', appName: '' });
+    } catch (error) {
+      console.error('Error deleting app:', error);
+      alert('Error deleting application. Please try again.');
+    } finally {
+      setDeleting(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDialog({ isOpen: false, appId: '', appName: '' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,7 +240,7 @@ export default function ProductionApps() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDelete(app.id)}
+                            onClick={() => handleDelete(app.id, app.name)}
                             disabled={deleting === app.id}
                             className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete"
@@ -311,7 +332,7 @@ export default function ProductionApps() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDelete(app.id)}
+                            onClick={() => handleDelete(app.id, app.name)}
                             disabled={deleting === app.id}
                             className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete"
@@ -409,6 +430,18 @@ export default function ProductionApps() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="Delete Application"
+        message={`Are you sure you want to delete "${confirmDialog.appName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        type="danger"
+      />
     </div>
   );
 }

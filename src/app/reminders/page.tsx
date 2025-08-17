@@ -13,6 +13,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { useNotifications, scheduleReminderNotifications } from '@/lib/notifications';
 
 interface Reminder {
@@ -35,6 +36,15 @@ export default function Reminders() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    reminderId: string;
+    reminderTitle: string;
+  }>({
+    isOpen: false,
+    reminderId: '',
+    reminderTitle: ''
+  });
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -96,18 +106,29 @@ export default function Reminders() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this reminder?')) {
-      try {
-        setDeleting(id);
-        await deleteDoc(doc(db, 'reminders', id));
-      } catch (error) {
-        console.error('Error deleting reminder:', error);
-        alert('Error deleting reminder. Please try again.');
-      } finally {
-        setDeleting(null);
-      }
+  const handleDelete = (id: string, title: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      reminderId: id,
+      reminderTitle: title
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleting(confirmDialog.reminderId);
+      await deleteDoc(doc(db, 'reminders', confirmDialog.reminderId));
+      setConfirmDialog({ isOpen: false, reminderId: '', reminderTitle: '' });
+    } catch (error) {
+      console.error('Error deleting reminder:', error);
+      alert('Error deleting reminder. Please try again.');
+    } finally {
+      setDeleting(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDialog({ isOpen: false, reminderId: '', reminderTitle: '' });
   };
 
   const handleComplete = async (id: string, isCompleted: boolean) => {
@@ -346,7 +367,7 @@ export default function Reminders() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDelete(reminder.id)}
+                            onClick={() => handleDelete(reminder.id, reminder.title)}
                             className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                             title="Delete"
                           >
@@ -450,6 +471,18 @@ export default function Reminders() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="Delete Reminder"
+        message={`Are you sure you want to delete "${confirmDialog.reminderTitle}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        type="danger"
+      />
     </div>
   );
 }

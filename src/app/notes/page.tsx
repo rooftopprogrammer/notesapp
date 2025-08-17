@@ -12,6 +12,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Note {
   id: string;
@@ -41,6 +42,15 @@ export default function Notes() {
   const [selectedTopic, setSelectedTopic] = useState<string>('all');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    noteId: string;
+    noteTitle: string;
+  }>({
+    isOpen: false,
+    noteId: '',
+    noteTitle: ''
+  });
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -94,18 +104,29 @@ export default function Notes() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this note?')) {
-      try {
-        setDeleting(id);
-        await deleteDoc(doc(db, 'notes', id));
-      } catch (error) {
-        console.error('Error deleting note:', error);
-        alert('Error deleting note. Please try again.');
-      } finally {
-        setDeleting(null);
-      }
+  const handleDelete = (id: string, title: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      noteId: id,
+      noteTitle: title
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleting(confirmDialog.noteId);
+      await deleteDoc(doc(db, 'notes', confirmDialog.noteId));
+      setConfirmDialog({ isOpen: false, noteId: '', noteTitle: '' });
+    } catch (error) {
+      console.error('Error deleting note:', error);
+      alert('Error deleting note. Please try again.');
+    } finally {
+      setDeleting(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDialog({ isOpen: false, noteId: '', noteTitle: '' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -358,7 +379,7 @@ export default function Notes() {
                             </svg>
                           </button>
                           <button
-                            onClick={() => handleDelete(note.id)}
+                            onClick={() => handleDelete(note.id, note.title)}
                             disabled={deleting === note.id}
                             className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:text-red-400 disabled:cursor-not-allowed rounded-lg transition-colors"
                             title="Delete"
@@ -514,6 +535,18 @@ export default function Notes() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="Delete Note"
+        message={`Are you sure you want to delete "${confirmDialog.noteTitle}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        type="danger"
+      />
     </div>
   );
 }

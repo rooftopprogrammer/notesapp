@@ -13,6 +13,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface TrackerEntry {
   id: string;

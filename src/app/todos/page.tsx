@@ -12,6 +12,7 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Todo {
   id: string;
@@ -54,6 +55,15 @@ export default function TodoList() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    todoId: string;
+    todoTitle: string;
+  }>({
+    isOpen: false,
+    todoId: '',
+    todoTitle: ''
+  });
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -134,18 +144,29 @@ export default function TodoList() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this todo?')) {
-      try {
-        setDeleting(id);
-        await deleteDoc(doc(db, 'todos', id));
-      } catch (error) {
-        console.error('Error deleting todo:', error);
-        alert('Error deleting todo. Please try again.');
-      } finally {
-        setDeleting(null);
-      }
+  const handleDelete = (id: string, title: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      todoId: id,
+      todoTitle: title
+    });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setDeleting(confirmDialog.todoId);
+      await deleteDoc(doc(db, 'todos', confirmDialog.todoId));
+      setConfirmDialog({ isOpen: false, todoId: '', todoTitle: '' });
+    } catch (error) {
+      console.error('Error deleting todo:', error);
+      alert('Error deleting todo. Please try again.');
+    } finally {
+      setDeleting(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setConfirmDialog({ isOpen: false, todoId: '', todoTitle: '' });
   };
 
   const handleComplete = async (id: string, isCompleted: boolean) => {
@@ -464,7 +485,7 @@ export default function TodoList() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => handleDelete(todo.id)}
+                          onClick={() => handleDelete(todo.id, todo.title)}
                           disabled={deleting === todo.id}
                           className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:text-red-400 disabled:cursor-not-allowed rounded-lg transition-colors"
                           title="Delete"
@@ -605,6 +626,18 @@ export default function TodoList() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title="Delete Todo"
+        message={`Are you sure you want to delete "${confirmDialog.todoTitle}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        type="danger"
+      />
     </div>
   );
 }
