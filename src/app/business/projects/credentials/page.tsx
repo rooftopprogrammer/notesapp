@@ -568,7 +568,7 @@ function ProjectCredentialsContent() {
                       {credential.notes && (
                         <div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">Notes</p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">{credential.notes}</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 overflow-hidden">{credential.notes}</p>
                         </div>
                       )}
                     </div>
