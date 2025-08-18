@@ -10,14 +10,7 @@ import {
   addDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
-// Check if Firebase is available
-const isFirebaseAvailable = () => {
-  return typeof window !== 'undefined' && 
-         process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
-         db !== null;
-};
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 
 interface User {
   id: string;
