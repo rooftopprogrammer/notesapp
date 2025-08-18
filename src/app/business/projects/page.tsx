@@ -348,6 +348,12 @@ export default function BusinessProjects() {
                       )}
                     </div>
                     <div className="flex space-x-2">
+                      <Link
+                        href={`/business/projects/credentials?projectId=${project.id}`}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition-colors"
+                      >
+                        Manage Credentials
+                      </Link>
                       <button
                         onClick={() => handleEdit(project)}
                         className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
@@ -359,12 +365,6 @@ export default function BusinessProjects() {
                         className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 transition-colors"
                       >
                         Add Sub-Project
-                      </button>
-                      <button
-                        onClick={() => handleEdit(project)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"
-                      >
-                        Edit
                       </button>
                       <button
                         onClick={() => handleDelete(project.id, project.name)}
@@ -395,6 +395,12 @@ export default function BusinessProjects() {
                             </div>
                           </div>
                           <div className="flex space-x-2 mt-3">
+                            <Link
+                              href={`/business/projects/credentials?projectId=${subProject.id}`}
+                              className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600 transition-colors flex-1 text-center"
+                            >
+                              Credentials
+                            </Link>
                             <button
                               onClick={() => handleEdit(subProject)}
                               className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors flex-1 text-center"
