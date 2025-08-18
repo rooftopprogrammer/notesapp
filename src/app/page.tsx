@@ -108,6 +108,16 @@ export default function Home() {
               </svg>
               Personal
             </Link>
+            
+            <Link
+              href="/cooking"
+              className="inline-flex items-center justify-center px-6 py-4 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors gap-3 shadow-lg hover:shadow-xl"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+              </svg>
+              Cooking
+            </Link>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mt-12">
