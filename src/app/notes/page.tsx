@@ -11,7 +11,7 @@ import {
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Note {
@@ -60,6 +60,12 @@ export default function Notes() {
 
   // Load notes from Firestore on component mount
   useEffect(() => {
+    if (!isFirebaseAvailable()) {
+      setError('Firebase is not available. Please check your configuration.');
+      setLoading(false);
+      return;
+    }
+
     const notesCollection = collection(db, 'notes');
     
     const unsubscribe = onSnapshot(notesCollection, (snapshot) => {
@@ -113,6 +119,8 @@ export default function Notes() {
   };
 
   const confirmDelete = async () => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
       setDeleting(confirmDialog.noteId);
       await deleteDoc(doc(db, 'notes', confirmDialog.noteId));
@@ -131,6 +139,8 @@ export default function Notes() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFirebaseAvailable()) return;
     
     if (!formData.title.trim() || !formData.content.trim()) {
       alert('Please fill in title and content');

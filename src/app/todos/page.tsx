@@ -11,7 +11,7 @@ import {
   onSnapshot,
   serverTimestamp 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Todo {
@@ -74,6 +74,12 @@ export default function TodoList() {
 
   // Load todos from Firestore
   useEffect(() => {
+    if (!isFirebaseAvailable()) {
+      setError('Firebase is not available. Please check your configuration.');
+      setLoading(false);
+      return;
+    }
+
     const todosCollection = collection(db, 'todos');
     
     const unsubscribe = onSnapshot(todosCollection, (snapshot) => {
@@ -153,6 +159,8 @@ export default function TodoList() {
   };
 
   const confirmDelete = async () => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
       setDeleting(confirmDialog.todoId);
       await deleteDoc(doc(db, 'todos', confirmDialog.todoId));
@@ -170,6 +178,8 @@ export default function TodoList() {
   };
 
   const handleComplete = async (id: string, isCompleted: boolean) => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
       setUpdating(id);
       await updateDoc(doc(db, 'todos', id), {
@@ -186,6 +196,8 @@ export default function TodoList() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFirebaseAvailable()) return;
     
     if (!formData.title.trim()) {
       alert('Please enter a title');

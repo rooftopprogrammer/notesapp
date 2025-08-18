@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Credential {
@@ -121,7 +121,7 @@ export default function BusinessCredentials() {
 
   // Load credentials from Firestore only if authenticated
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !isFirebaseAvailable()) return;
     
     console.log('Starting to load credentials from Firestore...');
     const credentialsCollection = collection(db, 'businessCredentials');
@@ -199,6 +199,8 @@ export default function BusinessCredentials() {
   };
 
   const confirmDelete = async () => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
       await deleteDoc(doc(db, 'businessCredentials', deleteConfirm.id));
       setDeleteConfirm({ show: false, id: '', title: '' });
@@ -210,6 +212,8 @@ export default function BusinessCredentials() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFirebaseAvailable()) return;
     
     if (!formData.username.trim() || !formData.password.trim()) {
       alert('Please enter username and password');

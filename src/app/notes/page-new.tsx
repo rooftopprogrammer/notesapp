@@ -9,8 +9,7 @@ import {
   deleteDoc, 
   doc, 
   onSnapshot,
-  serverTimestamp,
-  Timestamp 
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 

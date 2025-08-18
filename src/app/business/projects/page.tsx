@@ -14,7 +14,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Project {
@@ -111,7 +111,7 @@ export default function BusinessProjects() {
 
   // Load projects from Firestore
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !isFirebaseAvailable()) return;
 
     console.log('Setting up projects listener...');
     const q = query(collection(db, 'businessProjects'), orderBy('createdAt', 'desc'));
@@ -170,6 +170,8 @@ export default function BusinessProjects() {
   };
 
   const confirmDelete = async () => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
       await deleteDoc(doc(db, 'businessProjects', deleteConfirm.id));
       setDeleteConfirm({ show: false, id: '', title: '' });
@@ -204,6 +206,8 @@ export default function BusinessProjects() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFirebaseAvailable()) return;
     
     if (!formData.name.trim()) {
       alert('Please enter project name');

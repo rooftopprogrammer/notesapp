@@ -12,8 +12,7 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import ConfirmDialog from '@/components/ConfirmDialog';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 
 interface TrackerEntry {
   id: string;
@@ -84,6 +83,12 @@ export default function HomeTracker() {
 
   // Load entries from Firestore
   useEffect(() => {
+    if (!isFirebaseAvailable()) {
+      setError('Firebase is not available. Please check your configuration.');
+      setLoading(false);
+      return;
+    }
+
     const entriesCollection = collection(db, 'homeTracker');
     
     const unsubscribe = onSnapshot(entriesCollection, (snapshot) => {
@@ -139,6 +144,8 @@ export default function HomeTracker() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!isFirebaseAvailable()) return;
+    
     if (confirm('Are you sure you want to delete this entry?')) {
       try {
         setDeleting(id);
@@ -154,6 +161,8 @@ export default function HomeTracker() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFirebaseAvailable()) return;
     
     if (!formData.title.trim()) {
       alert('Please enter a title');

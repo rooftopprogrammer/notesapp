@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   Timestamp 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useNotifications, scheduleReminderNotifications } from '@/lib/notifications';
 
@@ -31,7 +31,6 @@ export default function Reminders() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,6 +61,12 @@ export default function Reminders() {
 
   // Load reminders from Firestore on component mount
   useEffect(() => {
+    if (!isFirebaseAvailable()) {
+      setError('Firebase is not available. Please check your configuration.');
+      setLoading(false);
+      return;
+    }
+
     const remindersCollection = collection(db, 'reminders');
     
     const unsubscribe = onSnapshot(remindersCollection, (snapshot) => {
@@ -115,15 +120,14 @@ export default function Reminders() {
   };
 
   const confirmDelete = async () => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
-      setDeleting(confirmDialog.reminderId);
       await deleteDoc(doc(db, 'reminders', confirmDialog.reminderId));
       setConfirmDialog({ isOpen: false, reminderId: '', reminderTitle: '' });
     } catch (error) {
       console.error('Error deleting reminder:', error);
       alert('Error deleting reminder. Please try again.');
-    } finally {
-      setDeleting(null);
     }
   };
 
@@ -132,6 +136,8 @@ export default function Reminders() {
   };
 
   const handleComplete = async (id: string, isCompleted: boolean) => {
+    if (!isFirebaseAvailable()) return;
+    
     try {
       setUpdating(id);
       await updateDoc(doc(db, 'reminders', id), {
@@ -148,6 +154,8 @@ export default function Reminders() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isFirebaseAvailable()) return;
     
     if (!formData.title.trim() || !formData.reminderTime) {
       alert('Please fill in title and reminder time');

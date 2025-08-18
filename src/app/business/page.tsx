@@ -12,6 +12,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
+// Check if Firebase is available
+const isFirebaseAvailable = () => {
+  return typeof window !== 'undefined' && 
+         process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
+         db !== null;
+};
+
 interface User {
   id: string;
   username: string;
@@ -121,6 +128,11 @@ export default function Business() {
   // Initialize default user in database if not exists
   useEffect(() => {
     const initializeUser = async () => {
+      if (!isFirebaseAvailable()) {
+        console.log('Firebase not available, skipping user initialization');
+        return;
+      }
+      
       try {
         const usersCollection = collection(db, 'businessUsers');
         const userQuery = query(usersCollection, where('username', '==', 'ravin'));
@@ -148,6 +160,12 @@ export default function Business() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    if (!isFirebaseAvailable()) {
+      setError('Firebase is not available. Please check your configuration.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       // Query user from Firestore

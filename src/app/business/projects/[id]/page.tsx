@@ -17,7 +17,7 @@ import {
   orderBy,
   getDoc
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 interface Project {
@@ -124,7 +124,7 @@ export default function ProjectCredentials() {
 
   // Load project details
   useEffect(() => {
-    if (!isAuthenticated || !projectId) return;
+    if (!isAuthenticated || !projectId || !isFirebaseAvailable()) return;
 
     const loadProject = async () => {
       try {
