@@ -61,6 +61,9 @@ function ProjectCredentialsContent() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [filteredCredentials, setFilteredCredentials] = useState<Credential[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [passwordVisibility, setPasswordVisibility] = useState<{[key: string]: boolean}>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,6 +194,29 @@ function ProjectCredentialsContent() {
 
     return () => unsubscribe();
   }, [isAuthenticated, projectId]);
+
+  // Filter credentials based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredCredentials(credentials);
+    } else {
+      const filtered = credentials.filter(credential => 
+        (credential.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (credential.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (credential.type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (credential.siteLink || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (credential.notes || '').toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredCredentials(filtered);
+    }
+  }, [credentials, searchTerm]);
+
+  const togglePasswordVisibility = (credentialId: string) => {
+    setPasswordVisibility(prev => ({
+      ...prev,
+      [credentialId]: !prev[credentialId]
+    }));
+  };
 
   const openModal = (credential?: Credential) => {
     if (credential) {
@@ -356,6 +382,39 @@ function ProjectCredentialsContent() {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+              placeholder="Search credentials..."
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {searchTerm && (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Found {filteredCredentials.length} credential{filteredCredentials.length !== 1 ? 's' : ''} matching &ldquo;{searchTerm}&rdquo;
+            </p>
+          )}
+        </div>
+
         {/* Error Message */}
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -391,9 +450,25 @@ function ProjectCredentialsContent() {
                   </button>
                 </div>
               </div>
+            ) : filteredCredentials.length === 0 ? (
+              <div className="text-center py-12">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No matching credentials</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Try adjusting your search terms or clear the search to see all credentials.</p>
+                <div className="mt-6">
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="inline-flex items-center px-4 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700"
+                  >
+                    Clear Search
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {credentials.map((credential) => (
+                {filteredCredentials.map((credential) => (
                   <div key={credential.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                     <div className="flex justify-between items-start mb-4">
                       <div>
@@ -430,7 +505,27 @@ function ProjectCredentialsContent() {
                       
                       <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Password</p>
-                        <p className="font-mono text-sm text-gray-900 dark:text-white break-all">{'•'.repeat(credential.password.length)}</p>
+                        <div className="flex items-center space-x-2">
+                          <p className="font-mono text-sm text-gray-900 dark:text-white break-all flex-1">
+                            {passwordVisibility[credential.id] ? credential.password : '•'.repeat(credential.password.length)}
+                          </p>
+                          <button
+                            onClick={() => togglePasswordVisibility(credential.id)}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded"
+                            title={passwordVisibility[credential.id] ? 'Hide password' : 'Show password'}
+                          >
+                            {passwordVisibility[credential.id] ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L12 12m-3.122-3.122L15 15m-3-3l3-3m-3 3l-3 3" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
                       </div>
 
                       {credential.siteLink && (
