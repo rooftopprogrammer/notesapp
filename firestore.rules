@@ -41,5 +41,15 @@ service cloud.firestore {
     match /businessCredentials/{document} {
       allow read, write: if true;
     }
+    
+    // Allow read and write access to the Amaravati places collection
+    match /places/{document} {
+      allow read, write: if true;
+    }
+    
+    // Allow read and write access to the Amaravati visits collection
+    match /visits/{document} {
+      allow read, write: if true;
+    }
   }
 }

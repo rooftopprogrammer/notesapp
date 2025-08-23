@@ -7,9 +7,9 @@ import { RecipeProgress } from '@/lib/types/recipe';
 import CookClient from './CookClient';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     recipeId: string;
-  };
+  }>;
 }
 
 export async function generateStaticParams(): Promise<{ recipeId: string }[]> {
@@ -37,7 +37,8 @@ function createDefaultProgress(): RecipeProgress {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
-    const recipe = await loadRecipe(params.recipeId);
+    const { recipeId } = await params;
+    const recipe = await loadRecipe(recipeId);
     return {
       title: recipe ? `Cook ${recipe.title} | RNotes` : 'Cook Recipe | RNotes',
       description: recipe 
@@ -55,8 +56,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CookPage({ params }: PageProps) {
   try {
+    const { recipeId } = await params;
+    
     // Load recipe data
-    const recipe = await loadRecipe(params.recipeId);
+    const recipe = await loadRecipe(recipeId);
     
     if (!recipe) {
       return (
