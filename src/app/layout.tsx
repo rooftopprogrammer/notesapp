@@ -24,6 +24,14 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "RNotes",
   },
+  icons: {
+    icon: [
+      { url: '/favicon.ico?v=2', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
+      { url: '/favicon.png?v=2', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png?v=2',
+    shortcut: '/favicon.ico?v=2',
+  },
 };
 
 export const viewport = {
