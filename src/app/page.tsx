@@ -100,6 +100,16 @@ export default function Home() {
             </Link>
             
             <Link
+              href="/taskmanagement"
+              className="inline-flex items-center justify-center px-6 py-4 bg-rose-600 hover:bg-rose-700 text-white font-medium rounded-lg transition-colors gap-3 shadow-lg hover:shadow-xl"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Task Management
+            </Link>
+            
+            <Link
               href="/personal"
               className="inline-flex items-center justify-center px-6 py-4 bg-pink-600 hover:bg-pink-700 text-white font-medium rounded-lg transition-colors gap-3 shadow-lg hover:shadow-xl"
             >
@@ -242,6 +252,22 @@ export default function Home() {
               </div>
               <p className="text-gray-600 dark:text-gray-300">
                 Comprehensive place tracking system with intelligence gathering, visit planning, and analytics dashboard.
+              </p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900 rounded-lg flex items-center justify-center">
+                  <svg className="w-6 h-6 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Task Management
+                </h3>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300">
+                Comprehensive task management system with categories, status tracking, and direct website links for efficient workflow.
               </p>
             </div>
           </div>

@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseAvailable } from '@/lib/firebase';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import toast from 'react-hot-toast';
 
 interface Project {
   id: string;
@@ -216,6 +217,50 @@ function ProjectCredentialsContent() {
       ...prev,
       [credentialId]: !prev[credentialId]
     }));
+  };
+
+  const copyToClipboard = async (text: string, fieldName: string) => {
+    if (!text || text.trim() === '') {
+      toast.error(`No ${fieldName.toLowerCase()} to copy`);
+      return;
+    }
+
+    try {
+      // Modern clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${fieldName} copied to clipboard!`, {
+          icon: '📋',
+        });
+      } else {
+        // Fallback for older browsers or non-HTTPS contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast.success(`${fieldName} copied to clipboard!`, {
+            icon: '📋',
+          });
+        } else {
+          throw new Error('Copy command was unsuccessful');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to copy text: ', error);
+      toast.error(`Failed to copy ${fieldName.toLowerCase()}. Please copy manually.`, {
+        icon: '❌',
+        duration: 4000,
+      });
+    }
   };
 
   const openModal = (credential?: Credential) => {
@@ -500,7 +545,18 @@ function ProjectCredentialsContent() {
                     <div className="space-y-3">
                       <div>
                         <p className="text-sm text-gray-500 dark:text-gray-400">Username</p>
-                        <p className="font-mono text-sm text-gray-900 dark:text-white break-all">{credential.username}</p>
+                        <div className="flex items-center space-x-2">
+                          <p className="font-mono text-sm text-gray-900 dark:text-white break-all flex-1">{credential.username}</p>
+                          <button
+                            onClick={() => copyToClipboard(credential.username, 'Username')}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded"
+                            title="Copy username"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                       
                       <div>
@@ -509,6 +565,15 @@ function ProjectCredentialsContent() {
                           <p className="font-mono text-sm text-gray-900 dark:text-white break-all flex-1">
                             {passwordVisibility[credential.id] ? credential.password : '•'.repeat(credential.password.length)}
                           </p>
+                          <button
+                            onClick={() => copyToClipboard(credential.password, 'Password')}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded"
+                            title="Copy password"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
                           <button
                             onClick={() => togglePasswordVisibility(credential.id)}
                             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1 rounded"

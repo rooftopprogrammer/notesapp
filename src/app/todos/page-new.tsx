@@ -82,62 +82,31 @@ export default function TodoPage() {
       return;
     }
 
-    // Initialize with default projects immediately for better UX
-    setProjects(defaultProjects);
-    setSelectedProject(defaultProjects[0]);
-
     // Load projects
     const projectsCollection = collection(db, 'projects');
-    const unsubscribeProjects = onSnapshot(
-      projectsCollection, 
-      (snapshot) => {
-        try {
-          if (snapshot.empty) {
-            // If no projects exist, keep default projects
-            setProjects(defaultProjects);
-            if (!selectedProject) {
-              setSelectedProject(defaultProjects[0]);
-            }
-          } else {
-            const projectsData = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              createdAt: doc.data().createdAt?.toDate() || new Date(),
-              updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-            })) as Project[];
-            setProjects(projectsData);
-            if (!selectedProject && projectsData.length > 0) {
-              setSelectedProject(projectsData[0]);
-            }
-          }
-          setLoading(false);
-        } catch (err) {
-          console.error('Error processing projects:', err);
-          // Fallback to default projects
-          setProjects(defaultProjects);
-          if (!selectedProject) {
-            setSelectedProject(defaultProjects[0]);
-          }
-          setLoading(false);
-        }
-      },
-      (err) => {
-        console.error('Error loading projects:', err);
-        setError(`Error loading projects: ${err.message}`);
-        // Fallback to default projects
+    const unsubscribeProjects = onSnapshot(projectsCollection, (snapshot) => {
+      if (snapshot.empty) {
+        // If no projects exist, use default projects
         setProjects(defaultProjects);
-        if (!selectedProject) {
-          setSelectedProject(defaultProjects[0]);
+        setSelectedProject(defaultProjects[0]);
+      } else {
+        const projectsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        })) as Project[];
+        setProjects(projectsData);
+        if (!selectedProject && projectsData.length > 0) {
+          setSelectedProject(projectsData[0]);
         }
-        setLoading(false);
       }
-    );
+    });
 
     return () => {
       unsubscribeProjects();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  }, []);
 
   // Load todos for selected project
   useEffect(() => {
@@ -146,30 +115,18 @@ export default function TodoPage() {
     const todosCollection = collection(db, 'todos');
     const todosQuery = query(todosCollection, where('projectId', '==', selectedProject.id));
     
-    const unsubscribeTodos = onSnapshot(
-      todosQuery,
-      (snapshot) => {
-        try {
-          const todosData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            dueDate: doc.data().dueDate?.toDate(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          })) as Todo[];
-          
-          setTodos(todosData);
-        } catch (err) {
-          console.error('Error processing todos:', err);
-          setTodos([]);
-        }
-      },
-      (err) => {
-        console.error('Error loading todos:', err);
-        toast.error(`Error loading todos: ${err.message}`);
-        setTodos([]);
-      }
-    );
+    const unsubscribeTodos = onSnapshot(todosQuery, (snapshot) => {
+      const todosData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        dueDate: doc.data().dueDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      })) as Todo[];
+      
+      setTodos(todosData);
+      setLoading(false);
+    });
 
     return () => {
       unsubscribeTodos();

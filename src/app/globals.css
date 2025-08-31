@@ -3,12 +3,18 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --toast-bg: #ffffff;
+  --toast-color: #171717;
+  --toast-border: #e5e7eb;
 }
 
 /* Dark mode variables */
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --toast-bg: #374151;
+  --toast-color: #f3f4f6;
+  --toast-border: #4b5563;
 }
 
 /* Override system preference for consistent dark mode default */
