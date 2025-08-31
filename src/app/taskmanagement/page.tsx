@@ -2,18 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-
-interface Task {
-  id: string;
-  serialNo: number;
-  type: string;
-  category: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'on-hold';
-  link: string;
-  title: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import { 
+  getTasks, 
+  addTask, 
+  updateTask, 
+  deleteTask, 
+  reorderTasks,
+  getNextSerialNo,
+  Task 
+} from '@/lib/taskManagement';
 
 export default function TaskManagement() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -21,6 +18,7 @@ export default function TaskManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     type: '',
     category: '',
@@ -29,30 +27,23 @@ export default function TaskManagement() {
     title: ''
   });
 
-  // Load tasks from localStorage on component mount
+  // Load tasks from Firestore on component mount
   useEffect(() => {
-    const savedTasks = localStorage.getItem('taskManagementData');
-    if (savedTasks) {
-      const parsedTasks = JSON.parse(savedTasks) as (Omit<Task, 'createdAt' | 'updatedAt'> & {
-        createdAt: string;
-        updatedAt: string;
-      })[];
-      const loadedTasks = parsedTasks.map((task) => ({
-        ...task,
-        createdAt: new Date(task.createdAt),
-        updatedAt: new Date(task.updatedAt)
-      }));
-      setTasks(loadedTasks);
-      setFilteredTasks(loadedTasks);
-    }
-  }, []);
+    const loadTasks = async () => {
+      try {
+        setLoading(true);
+        const loadedTasks = await getTasks();
+        setTasks(loadedTasks);
+        setFilteredTasks(loadedTasks);
+      } catch (error) {
+        console.error('Error loading tasks:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Save tasks to localStorage whenever tasks change
-  useEffect(() => {
-    if (tasks.length > 0) {
-      localStorage.setItem('taskManagementData', JSON.stringify(tasks));
-    }
-  }, [tasks]);
+    loadTasks();
+  }, []);
 
   // Filter tasks based on search query
   useEffect(() => {
@@ -70,15 +61,7 @@ export default function TaskManagement() {
     }
   }, [tasks, searchQuery]);
 
-  const generateId = () => {
-    return Date.now().toString() + Math.random().toString(36).substr(2, 9);
-  };
-
-  const getNextSerialNo = () => {
-    return tasks.length > 0 ? Math.max(...tasks.map(t => t.serialNo)) + 1 : 1;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.type || !formData.category || !formData.title) {
@@ -86,41 +69,44 @@ export default function TaskManagement() {
       return;
     }
 
-    if (editingTask) {
-      // Update existing task
-      const updatedTasks = tasks.map(task => 
-        task.id === editingTask.id 
-          ? {
-              ...task,
-              ...formData,
-              updatedAt: new Date()
-            }
-          : task
-      );
-      setTasks(updatedTasks);
-    } else {
-      // Create new task
-      const newTask: Task = {
-        id: generateId(),
-        serialNo: getNextSerialNo(),
-        ...formData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      const updatedTasks = [...tasks, newTask];
-      setTasks(updatedTasks);
-    }
+    try {
+      if (editingTask) {
+        // Update existing task
+        await updateTask(editingTask.id, formData);
+        const updatedTasks = tasks.map(task => 
+          task.id === editingTask.id 
+            ? {
+                ...task,
+                ...formData,
+                updatedAt: new Date()
+              }
+            : task
+        );
+        setTasks(updatedTasks);
+      } else {
+        // Create new task
+        const nextSerialNo = await getNextSerialNo();
+        const newTask = await addTask({
+          serialNo: nextSerialNo,
+          ...formData
+        });
+        setTasks([...tasks, newTask]);
+      }
 
-    // Reset form
-    setFormData({
-      type: '',
-      category: '',
-      status: 'pending',
-      link: '',
-      title: ''
-    });
-    setShowForm(false);
-    setEditingTask(null);
+      // Reset form
+      setFormData({
+        type: '',
+        category: '',
+        status: 'pending',
+        link: '',
+        title: ''
+      });
+      setShowForm(false);
+      setEditingTask(null);
+    } catch (error) {
+      console.error('Error saving task:', error);
+      alert('Error saving task. Please try again.');
+    }
   };
 
   const handleEdit = (task: Task) => {
@@ -135,15 +121,27 @@ export default function TaskManagement() {
     setShowForm(true);
   };
 
-  const handleDelete = (taskId: string) => {
-    if (confirm('Are you sure you want to delete this task?')) {
+  const handleDelete = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+
+    try {
+      await deleteTask(taskId);
       const updatedTasks = tasks.filter(task => task.id !== taskId);
+      
       // Reorder serial numbers
       const reorderedTasks = updatedTasks.map((task, index) => ({
         ...task,
         serialNo: index + 1
       }));
+      
+      // Update serial numbers in Firestore
+      await reorderTasks(reorderedTasks);
       setTasks(reorderedTasks);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      alert('Error deleting task. Please try again.');
     }
   };
 
@@ -347,7 +345,17 @@ export default function TaskManagement() {
             </h2>
           </div>
           
-          {filteredTasks.length === 0 ? (
+          {loading ? (
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="animate-spin h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <p className="text-gray-500 dark:text-gray-400">Loading tasks...</p>
+            </div>
+          ) : filteredTasks.length === 0 ? (
             <div className="p-8 text-center">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
