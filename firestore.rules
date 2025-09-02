@@ -22,6 +22,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Allow read and write access to the tasks collection (Task Management)
+    match /tasks/{document} {
+      allow read, write: if true;
+    }
+    
     // Allow read and write access to the projects collection
     match /projects/{document} {
       allow read, write: if true;
