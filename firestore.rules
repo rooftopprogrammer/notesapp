@@ -27,6 +27,31 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Allow read and write access to the personal finance collections
+    match /personalFinanceTransactions/{document} {
+      allow read, write: if true;
+    }
+    
+    match /personalFinanceBudgets/{document} {
+      allow read, write: if true;
+    }
+    
+    match /personalFinanceEMIs/{document} {
+      allow read, write: if true;
+    }
+    
+    match /personalFinanceLoans/{document} {
+      allow read, write: if true;
+    }
+    
+    match /personalFinanceCreditCards/{document} {
+      allow read, write: if true;
+    }
+    
+    match /personalFinanceSubscriptions/{document} {
+      allow read, write: if true;
+    }
+    
     // Allow read and write access to the projects collection
     match /projects/{document} {
       allow read, write: if true;
