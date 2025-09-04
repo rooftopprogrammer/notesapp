@@ -296,12 +296,23 @@ export default function BusinessProjects() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Business Projects</h1>
               <p className="text-gray-600 dark:text-gray-300 mt-2">Organize your credentials by projects</p>
             </div>
-            <button
-              onClick={handleAdd}
-              className="bg-blue-600 dark:bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-            >
-              Add Project
-            </button>
+            <div className="flex gap-3">
+              <Link
+                href="/business/projects/all-credentials"
+                className="bg-green-600 dark:bg-green-700 text-white px-6 py-3 rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                List View
+              </Link>
+              <button
+                onClick={handleAdd}
+                className="bg-blue-600 dark:bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+              >
+                Add Project
+              </button>
+            </div>
           </div>
         </div>
 
