@@ -52,6 +52,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Allow read and write access to the personal goals collection
+    match /personalGoals/{document} {
+      allow read, write: if true;
+    }
+    
+    // Allow read and write access to the personal habits collection
+    match /personalHabits/{document} {
+      allow read, write: if true;
+    }
+    
     // Allow read and write access to the projects collection
     match /projects/{document} {
       allow read, write: if true;

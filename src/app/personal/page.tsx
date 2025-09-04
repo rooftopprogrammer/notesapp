@@ -1,8 +1,27 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { getGoalStats, getHabitStats } from '@/lib/goalsHabits';
 
 export default function Personal() {
+  const [goalStats, setGoalStats] = useState({ total: 0, completed: 0, inProgress: 0, notStarted: 0, onHold: 0 });
+  const [habitStats, setHabitStats] = useState({ total: 0, active: 0, completedToday: 0, totalStreaks: 0 });
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const goals = await getGoalStats();
+      const habits = await getHabitStats();
+      setGoalStats(goals);
+      setHabitStats(habits);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
   return (
     <main className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-50 p-4">
       {/* Header */}
@@ -133,16 +152,25 @@ export default function Personal() {
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Personal Overview</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-pink-600 mb-2">0</div>
-              <div className="text-gray-600">Active Goals</div>
+              <div className="text-3xl font-bold text-pink-600 mb-2">{goalStats.total}</div>
+              <div className="text-gray-600">Total Goals</div>
+              <div className="text-sm text-gray-500 mt-1">
+                {goalStats.inProgress} in progress, {goalStats.completed} completed
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600 mb-2">0</div>
-              <div className="text-gray-600">Completed Habits</div>
+              <div className="text-3xl font-bold text-blue-600 mb-2">{habitStats.completedToday}</div>
+              <div className="text-gray-600">Completed Today</div>
+              <div className="text-sm text-gray-500 mt-1">
+                {habitStats.active} active habits
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600 mb-2">0</div>
-              <div className="text-gray-600">Journal Entries</div>
+              <div className="text-3xl font-bold text-purple-600 mb-2">{habitStats.totalStreaks}</div>
+              <div className="text-gray-600">Total Streaks</div>
+              <div className="text-sm text-gray-500 mt-1">
+                Combined from all habits
+              </div>
             </div>
           </div>
         </div>
