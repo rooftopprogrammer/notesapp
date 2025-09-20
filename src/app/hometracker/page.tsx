@@ -61,6 +61,13 @@ const TRACKER_CATEGORIES = [
     icon: '🍎', 
     color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
     examples: ['Calories', 'Water Intake', 'Meals', 'Diet Plan', 'Nutrition']
+  },
+  { 
+    id: 'diet', 
+    name: 'Family Diet', 
+    icon: '🥗', 
+    color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/20 dark:text-teal-400',
+    examples: ['Family Meals', 'Weekly Menu', 'Dietary Restrictions', 'Meal Planning', 'Grocery List']
   }
 ];
 

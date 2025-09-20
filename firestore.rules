@@ -72,6 +72,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
     
+    // Allow read and write access to the dietInstructions collection
+    match /dietInstructions/{document} {
+      allow read, write: if true;
+    }
+    
     // Allow read and write access to the businessUsers collection for authentication
     match /businessUsers/{document} {
       allow read, write: if true;
