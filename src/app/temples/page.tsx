@@ -1,17 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTemplePlans } from '@/hooks/useTemplePlans';
 import { TempleCard } from '@/components/temples/TempleCard';
 import { TempleFilters } from '@/lib/types/temple';
+import AuthModal from '@/components/AuthModal';
 
 export default function TemplePage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, error: authError, signInAnonymouslyIfNeeded } = useAuth();
   const [filters, setFilters] = useState<TempleFilters>({});
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const { plans, loading, error } = useTemplePlans(filters);
+
+  // Auto sign-in anonymously when component mounts
+  useEffect(() => {
+    const handleAuth = async () => {
+      if (!authLoading && !user) {
+        try {
+          await signInAnonymouslyIfNeeded();
+        } catch (error) {
+          console.error('Auto auth failed:', error);
+          setShowAuthModal(true);
+        }
+      }
+    };
+
+    handleAuth();
+  }, [authLoading, user, signInAnonymouslyIfNeeded]);
+
+  // Show auth modal if there's an auth error
+  useEffect(() => {
+    if (authError && authError.includes('Anonymous authentication is disabled')) {
+      setShowAuthModal(true);
+    }
+  }, [authError]);
 
   if (loading) {
     return (
@@ -531,6 +556,11 @@ export default function TemplePage() {
           </div>
         </div>
       </div>
+      
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </div>
   );
 }

@@ -21,8 +21,17 @@ export default function NewTemplePage() {
       if (!user) {
         console.log('No user found, signing in anonymously...');
         await signInAnonymouslyIfNeeded();
+        
+        // Wait a moment for auth state to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if we now have a user
+        if (!user) {
+          throw new Error('Authentication failed. Please check if anonymous authentication is enabled in Firebase Console.');
+        }
       }
       
+      console.log('Creating temple plan with user:', user?.uid);
       const planId = await createPlan(data);
       
       if (planId) {
@@ -36,7 +45,15 @@ export default function NewTemplePage() {
       }
     } catch (error) {
       console.error('Error creating temple plan:', error);
-      alert('Failed to create temple plan. Please try again.');
+      if (error instanceof Error) {
+        if (error.message.includes('admin-restricted-operation')) {
+          alert('Authentication issue: Anonymous sign-in may be disabled. Please contact support.');
+        } else {
+          alert(`Failed to create temple plan: ${error.message}`);
+        }
+      } else {
+        alert('Failed to create temple plan. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }

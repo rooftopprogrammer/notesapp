@@ -1,0 +1,12 @@
+{
+  "users": [],
+  "config": {
+    "signIn": {
+      "allowDuplicateEmails": false,
+      "methods": [
+        "anonymous",
+        "email"
+      ]
+    }
+  }
+}
