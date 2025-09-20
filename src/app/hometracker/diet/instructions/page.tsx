@@ -48,12 +48,14 @@ function SortableInstructionCard({
   instruction, 
   copiedId, 
   onCopy, 
-  onDelete 
+  onDelete,
+  onEdit
 }: { 
   instruction: Instruction;
   copiedId: string | null;
   onCopy: (instruction: Instruction) => void;
   onDelete: (id: string) => void;
+  onEdit: (instruction: Instruction) => void;
 }) {
   const {
     attributes,
@@ -77,18 +79,18 @@ function SortableInstructionCard({
         isDragging ? 'opacity-50' : ''
       }`}
     >
-      {/* Drag Handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="flex justify-between items-start mb-3"
-      >
+      {/* Header with title and action buttons */}
+      <div className="flex justify-between items-start mb-3">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors flex-1">
           {instruction.title}
         </h3>
         <div className="flex items-center gap-2">
           {/* Drag Handle Icon */}
-          <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+          <div 
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
             </svg>
@@ -98,10 +100,27 @@ function SortableInstructionCard({
           )}
           <button
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
+              console.log('Edit button clicked for:', instruction.id);
+              onEdit(instruction);
+            }}
+            className="text-blue-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity z-10 relative"
+            title="Edit instruction"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Delete button clicked for:', instruction.id);
               onDelete(instruction.id);
             }}
-            className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity z-10 relative"
+            title="Delete instruction"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -134,6 +153,7 @@ export default function DietInstructionsPage() {
     title: '',
     instruction: ''
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Drag and drop sensors
@@ -183,6 +203,11 @@ export default function DietInstructionsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // If editing, use the update handler instead
+    if (editingId) {
+      return handleUpdateInstruction(e);
+    }
     
     if (!isFirebaseAvailable()) {
       alert('Firebase is not available. Please check your configuration.');
@@ -259,16 +284,62 @@ export default function DietInstructionsPage() {
   };
 
   const handleDeleteInstruction = async (id: string) => {
-    if (!isFirebaseAvailable()) return;
+    if (!isFirebaseAvailable()) {
+      alert('Firebase is not available. Please check your connection.');
+      return;
+    }
     
     if (confirm('Are you sure you want to delete this instruction?')) {
       try {
+        console.log('Attempting to delete instruction with id:', id);
         await deleteDoc(doc(db, 'dietInstructions', id));
+        console.log('Successfully deleted instruction:', id);
       } catch (error) {
         console.error('Error deleting instruction:', error);
-        alert('Error deleting instruction. Please try again.');
+        alert(`Error deleting instruction: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
+  };
+
+  const handleEditInstruction = (instruction: Instruction) => {
+    setEditingId(instruction.id);
+    setFormData({
+      title: instruction.title,
+      instruction: instruction.instruction
+    });
+  };
+
+  const handleUpdateInstruction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingId || !isFirebaseAvailable()) return;
+
+    if (!formData.title.trim() || !formData.instruction.trim()) {
+      alert('Please fill in both title and instruction');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'dietInstructions', editingId), {
+        title: formData.title.trim(),
+        instruction: formData.instruction.trim(),
+        updatedAt: serverTimestamp(),
+      });
+      
+      // Reset form
+      setFormData({ title: '', instruction: '' });
+      setEditingId(null);
+    } catch (error) {
+      console.error('Error updating instruction:', error);
+      alert(`Error updating instruction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({ title: '', instruction: '' });
   };
 
   return (
@@ -304,8 +375,11 @@ export default function DietInstructionsPage() {
           </div>
         </div>
 
-        {/* Add Instruction Form */}
+        {/* Add/Edit Instruction Form */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            {editingId ? 'Edit Instruction' : 'Add New Instruction'}
+          </h2>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
             Add New Instruction
           </h2>
@@ -339,13 +413,24 @@ export default function DietInstructionsPage() {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full sm:w-auto px-6 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-medium rounded-md transition-colors"
-            >
-              {saving ? 'Adding...' : 'Add Instruction'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 sm:flex-none px-6 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-medium rounded-md transition-colors"
+              >
+                {saving ? (editingId ? 'Updating...' : 'Adding...') : (editingId ? 'Update Instruction' : 'Add Instruction')}
+              </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="px-6 py-2 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 font-medium rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
@@ -398,6 +483,7 @@ export default function DietInstructionsPage() {
                       copiedId={copiedId}
                       onCopy={handleCopyInstruction}
                       onDelete={handleDeleteInstruction}
+                      onEdit={handleEditInstruction}
                     />
                   ))}
                 </div>
