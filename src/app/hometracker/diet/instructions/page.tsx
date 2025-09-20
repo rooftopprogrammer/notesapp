@@ -49,13 +49,17 @@ function SortableInstructionCard({
   copiedId, 
   onCopy, 
   onDelete,
-  onEdit
+  onEdit,
+  isExpanded,
+  onToggleExpansion
 }: { 
   instruction: Instruction;
   copiedId: string | null;
   onCopy: (instruction: Instruction) => void;
   onDelete: (id: string) => void;
   onEdit: (instruction: Instruction) => void;
+  isExpanded: boolean;
+  onToggleExpansion: (id: string) => void;
 }) {
   const {
     attributes,
@@ -75,7 +79,7 @@ function SortableInstructionCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-all cursor-pointer group ${
+      className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-all cursor-pointer group min-h-[280px] flex flex-col ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
@@ -129,12 +133,49 @@ function SortableInstructionCard({
         </div>
       </div>
       
-      <div onClick={() => onCopy(instruction)}>
-        <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap mb-3">
-          {instruction.instruction}
-        </p>
+      <div onClick={() => onCopy(instruction)} className="flex-1 flex flex-col">
+        <div className="relative flex-1">
+          <p 
+            className={`text-gray-600 dark:text-gray-300 whitespace-pre-wrap mb-3 ${
+              !isExpanded ? 'line-clamp-6' : ''
+            }`}
+            style={{
+              lineHeight: '1.5',
+              ...((!isExpanded) ? {
+                display: '-webkit-box',
+                WebkitLineClamp: 6,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
+                minHeight: '9rem',
+                maxHeight: '9rem'
+              } : {})
+            }}
+          >
+            {instruction.instruction}
+          </p>
+          
+          {/* Check if content needs truncation */}
+          {(() => {
+            const lines = instruction.instruction.split('\n');
+            const hasMultipleLines = lines.length > 6;
+            const hasLongContent = instruction.instruction.length > 240; // Approximate 6 lines worth
+            const needsTruncation = hasMultipleLines || hasLongContent;
+            
+            return needsTruncation ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpansion(instruction.id);
+                }}
+                className="text-teal-500 hover:text-teal-600 text-sm font-medium mb-3 block"
+              >
+                {isExpanded ? 'See Less' : 'See More'}
+              </button>
+            ) : null;
+          })()}
+        </div>
         
-        <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400 mt-auto">
           <span>Click to copy instruction</span>
           {instruction.createdAt && (
             <span>{instruction.createdAt.toLocaleDateString()}</span>
@@ -155,6 +196,7 @@ export default function DietInstructionsPage() {
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -342,6 +384,18 @@ export default function DietInstructionsPage() {
     setFormData({ title: '', instruction: '' });
   };
 
+  const toggleCardExpansion = (cardId: string) => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -484,6 +538,8 @@ export default function DietInstructionsPage() {
                       onCopy={handleCopyInstruction}
                       onDelete={handleDeleteInstruction}
                       onEdit={handleEditInstruction}
+                      isExpanded={expandedCards.has(instruction.id)}
+                      onToggleExpansion={toggleCardExpansion}
                     />
                   ))}
                 </div>
