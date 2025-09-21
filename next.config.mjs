@@ -2,7 +2,8 @@ import withPWA from "next-pwa";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // Static export for Firebase Hosting
+  // Removed static export to allow dynamic routes with client components
+  // output: 'export', // Static export for Firebase Hosting
   trailingSlash: true,
   images: {
     unoptimized: true

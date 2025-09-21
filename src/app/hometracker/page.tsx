@@ -32,42 +32,48 @@ const TRACKER_CATEGORIES = [
     name: 'Fitness', 
     icon: '💪', 
     color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-    examples: ['Workout', 'Steps', 'Weight', 'Running', 'Gym Session']
+    examples: ['Workout', 'Steps', 'Weight', 'Running', 'Gym Session'],
+    status: 'functional'
   },
   { 
     id: 'health', 
     name: 'Health', 
     icon: '🩺', 
     color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-    examples: ['Blood Pressure', 'Heart Rate', 'Doctor Visit', 'Checkup', 'Symptoms']
+    examples: ['Blood Pressure', 'Heart Rate', 'Doctor Visit', 'Checkup', 'Symptoms'],
+    status: 'functional'
   },
   { 
     id: 'medications', 
     name: 'Medications', 
     icon: '💊', 
     color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
-    examples: ['Morning Pills', 'Vitamin D', 'Prescription', 'Supplements', 'Dosage']
+    examples: ['Morning Pills', 'Vitamin D', 'Prescription', 'Supplements', 'Dosage'],
+    status: 'functional'
   },
   { 
     id: 'vaccines', 
     name: 'Vaccines', 
     icon: '💉', 
     color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400',
-    examples: ['COVID Booster', 'Flu Shot', 'Travel Vaccines', 'Annual Shots', 'Immunization']
+    examples: ['COVID Booster', 'Flu Shot', 'Travel Vaccines', 'Annual Shots', 'Immunization'],
+    status: 'functional'
   },
   { 
     id: 'food', 
     name: 'Food', 
     icon: '🍎', 
     color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
-    examples: ['Calories', 'Water Intake', 'Meals', 'Diet Plan', 'Nutrition']
+    examples: ['Calories', 'Water Intake', 'Meals', 'Diet Plan', 'Nutrition'],
+    status: 'functional'
   },
   { 
     id: 'diet', 
     name: 'Family Diet', 
     icon: '🥗', 
     color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/20 dark:text-teal-400',
-    examples: ['Family Meals', 'Weekly Menu', 'Dietary Restrictions', 'Meal Planning', 'Grocery List']
+    examples: ['Family Meals', 'Weekly Menu', 'Dietary Restrictions', 'Meal Planning', 'Grocery List'],
+    status: 'partial' // Has Instructions (functional) but other features are not functional
   }
 ];
 
@@ -300,10 +306,33 @@ export default function HomeTracker() {
                 <Link
                   key={category.id}
                   href={`/hometracker/${category.id}`}
-                  className={`flex flex-col items-center p-4 sm:p-6 rounded-lg border-2 transition-all hover:shadow-md ${
+                  className={`flex flex-col items-center p-4 sm:p-6 rounded-lg border-2 transition-all hover:shadow-md relative ${
                     'border-gray-200 dark:border-gray-600 hover:border-teal-300 dark:hover:border-teal-500 bg-white dark:bg-gray-800'
                   }`}
                 >
+                  {/* Status Icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center">
+                    {category.status === 'functional' ? (
+                      <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : category.status === 'partial' ? (
+                      <div className="w-6 h-6 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.996-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="text-2xl sm:text-4xl mb-2 sm:mb-3">{category.icon}</div>
                   <h3 className="text-sm sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 text-center">
                     {category.name}
@@ -311,12 +340,56 @@ export default function HomeTracker() {
                   <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-2 text-center hidden sm:block">
                     {category.examples.slice(0, 2).join(', ')}...
                   </p>
-                  <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${category.color}`}>
-                    {count} entries
-                  </span>
+                  <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2">
+                    <span className={`inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium ${category.color}`}>
+                      {count} entries
+                    </span>
+                    <span className={`text-xs font-medium ${
+                      category.status === 'functional' ? 'text-green-600 dark:text-green-400' :
+                      category.status === 'partial' ? 'text-yellow-600 dark:text-yellow-400' :
+                      'text-red-600 dark:text-red-400'
+                    }`}>
+                      {category.status === 'functional' ? '✓ Functional' :
+                       category.status === 'partial' ? '⚠ Partial' :
+                       '✗ Not Functional'}
+                    </span>
+                  </div>
                 </Link>
               );
             })}
+          </div>
+          
+          {/* Status Legend */}
+          <div className="px-4 sm:px-6 lg:px-8 pb-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+              <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Feature Status:</h5>
+              <div className="flex flex-wrap gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-green-600 dark:text-green-400">Functional - Fully working</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.996-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <span className="text-yellow-600 dark:text-yellow-400">Partial - Some features working</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <span className="text-red-600 dark:text-red-400">Not Functional - Coming soon</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

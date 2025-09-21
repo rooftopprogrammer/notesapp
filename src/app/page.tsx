@@ -139,7 +139,7 @@ export default function Home() {
               Home Tracker
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-              Track your health, fitness, medications, vaccines, and food intake all in one place.
+              Track your health, fitness, medications, vaccines, food intake, and family diet plans all in one place.
             </p>
           </Link>
 

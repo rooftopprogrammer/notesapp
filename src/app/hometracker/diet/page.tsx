@@ -54,32 +54,105 @@ export default function FamilyDietTracker() {
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <Link
+                  href="/hometracker/diet/meal-planning"
+                  className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border-2 border-teal-200 dark:border-teal-700 hover:border-teal-300 dark:hover:border-teal-600 transition-colors cursor-pointer relative"
+                >
+                  {/* Functional status icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                   <div className="text-2xl mb-2">📅</div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-1">Meal Planning</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Plan weekly family meals</p>
-                </div>
+                  <h4 className="font-medium text-teal-900 dark:text-teal-100 mb-1">Meal Planning</h4>
+                  <p className="text-sm text-teal-700 dark:text-teal-300">Plan weekly family meals</p>
+                  <span className="text-xs text-green-600 font-medium mt-1 block">✓ Functional</span>
+                </Link>
+
+                <Link
+                  href="/hometracker/diet/family-profiles"
+                  className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-700 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer relative"
+                >
+                  {/* Functional status icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="text-2xl mb-2">👥</div>
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">Family Profiles</h4>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">Manage family member info</p>
+                  <span className="text-xs text-green-600 font-medium mt-1 block">✓ Functional</span>
+                </Link>
                 
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg relative">
+                  {/* Non-functional status icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
                   <div className="text-2xl mb-2">🥘</div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-1">Recipe Management</h4>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Store family favorite recipes</p>
+                  <span className="text-xs text-red-500 font-medium mt-1 block">Not Functional</span>
                 </div>
                 
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <Link
+                  href="/hometracker/diet/grocery-lists"
+                  className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-200 dark:border-green-700 hover:border-green-300 dark:hover:border-green-600 transition-colors cursor-pointer relative"
+                >
+                  {/* Functional status icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                   <div className="text-2xl mb-2">🛒</div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-1">Grocery Lists</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Generate shopping lists</p>
-                </div>
+                  <h4 className="font-medium text-green-900 dark:text-green-100 mb-1">Grocery Lists</h4>
+                  <p className="text-sm text-green-700 dark:text-green-300">Generate shopping lists</p>
+                  <span className="text-xs text-green-600 font-medium mt-1 block">✓ Functional</span>
+                </Link>
 
                 <Link
                   href="/hometracker/diet/instructions"
-                  className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border-2 border-teal-200 dark:border-teal-700 hover:border-teal-300 dark:hover:border-teal-600 transition-colors cursor-pointer"
+                  className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border-2 border-teal-200 dark:border-teal-700 hover:border-teal-300 dark:hover:border-teal-600 transition-colors cursor-pointer relative"
                 >
+                  {/* Functional status icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                   <div className="text-2xl mb-2">📝</div>
                   <h4 className="font-medium text-teal-900 dark:text-teal-100 mb-1">Instructions</h4>
                   <p className="text-sm text-teal-700 dark:text-teal-300">Add and manage diet instructions</p>
+                  <span className="text-xs text-green-600 font-medium mt-1 block">✓ Functional</span>
                 </Link>
+              </div>
+
+              {/* Status Legend */}
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">Feature Status:</h5>
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="text-green-600 dark:text-green-400">Functional - Ready to use</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                    <span className="text-red-600 dark:text-red-400">Not Functional - Coming soon</span>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-8">
