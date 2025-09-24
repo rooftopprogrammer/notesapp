@@ -14,10 +14,9 @@ import FullProcess from './FullProcess';
 interface CookClientProps {
   recipe: Recipe;
   initialProgress: RecipeProgress;
-  userId?: string;
 }
 
-export default function CookClient({ recipe, initialProgress, userId }: CookClientProps) {
+export default function CookClient({ recipe, initialProgress }: CookClientProps) {
   const [progress, setProgress] = useState<RecipeProgress>(initialProgress);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(() => {
     // Determine initial step based on progress
@@ -49,15 +48,10 @@ export default function CookClient({ recipe, initialProgress, userId }: CookClie
 
   // Save progress to Firestore
   const saveProgressData = useCallback(async (newProgress: RecipeProgress) => {
-    if (userId) {
-      try {
-        await saveProgress(userId, recipe.id, newProgress);
-      } catch (error) {
-        console.error('Failed to save progress:', error);
-        // Could show a toast notification here
-      }
-    }
-  }, [recipe.id, userId]);
+    // TODO: Implement user authentication and save progress
+    // For now, progress is only stored in memory
+    console.log('Progress would be saved:', newProgress);
+  }, [recipe.id]);
 
   // Update progress and save
   const updateProgress = useCallback((updater: (prev: RecipeProgress) => RecipeProgress) => {
