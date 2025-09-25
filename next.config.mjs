@@ -4,10 +4,13 @@ import withPWA from "next-pwa";
 const nextConfig = {
   // Enable static export for Firebase Hosting
   output: 'export',
-  distDir: 'out',
   trailingSlash: true,
   images: {
     unoptimized: true
+  },
+  // Disable dynamic routes for static export
+  generateBuildId: async () => {
+    return 'build'
   },
   typescript: {
     // Dangerously allow production builds to successfully complete even if
