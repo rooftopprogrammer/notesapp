@@ -74,6 +74,14 @@ const TRACKER_CATEGORIES = [
     color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/20 dark:text-teal-400',
     examples: ['Family Meals', 'Weekly Menu', 'Dietary Restrictions', 'Meal Planning', 'Grocery List'],
     status: 'partial' // Has Instructions (functional) but other features are not functional
+  },
+  { 
+    id: 'weight', 
+    name: 'Weight Tracker', 
+    icon: '⚖️', 
+    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400',
+    examples: ['Weekly Weight', 'Family Progress', 'Weight Goals', 'BMI Tracking', 'Health Progress'],
+    status: 'functional'
   }
 ];
 

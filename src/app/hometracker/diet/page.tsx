@@ -1,8 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import CountdownTimer from '@/components/CountdownTimer';
 
 export default function FamilyDietTracker() {
+  // Set countdown end date to September 25, 2026 (365 days from today)
+  const endDate = new Date('2026-09-25T23:59:59');
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -36,6 +40,13 @@ export default function FamilyDietTracker() {
           </div>
         </div>
 
+        {/* 365-Day Countdown Timer */}
+        <CountdownTimer 
+          endDate={endDate}
+          title="365-Day Diet Journey"
+          description="Your family's year-long nutrition transformation countdown"
+        />
+
         {/* Empty State */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="text-center py-16 px-6">
@@ -53,7 +64,7 @@ export default function FamilyDietTracker() {
             </p>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
                 <Link
                   href="/hometracker/diet/meal-planning"
                   className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg border-2 border-teal-200 dark:border-teal-700 hover:border-teal-300 dark:hover:border-teal-600 transition-colors cursor-pointer relative"
@@ -128,6 +139,22 @@ export default function FamilyDietTracker() {
                   <div className="text-2xl mb-2">📝</div>
                   <h4 className="font-medium text-teal-900 dark:text-teal-100 mb-1">Instructions</h4>
                   <p className="text-sm text-teal-700 dark:text-teal-300">Add and manage diet instructions</p>
+                  <span className="text-xs text-green-600 font-medium mt-1 block">✓ Functional</span>
+                </Link>
+
+                <Link
+                  href="/hometracker/diet/notes"
+                  className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border-2 border-purple-200 dark:border-purple-700 hover:border-purple-300 dark:hover:border-purple-600 transition-colors cursor-pointer relative"
+                >
+                  {/* Functional status icon */}
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div className="text-2xl mb-2">📓</div>
+                  <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-1">Notes</h4>
+                  <p className="text-sm text-purple-700 dark:text-purple-300">Record changes and observations</p>
                   <span className="text-xs text-green-600 font-medium mt-1 block">✓ Functional</span>
                 </Link>
               </div>

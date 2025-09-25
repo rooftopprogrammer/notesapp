@@ -17,7 +17,8 @@ import {
   Download, 
   RefreshCw,
   TrendingUp,
-  Video
+  Video,
+  BookOpen
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
@@ -192,6 +193,15 @@ export default function DashboardPage() {
               </div>
 
               {/* Action buttons */}
+              <Link
+                href="/amaravati/research"
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm"
+                title="Research Center"
+              >
+                <BookOpen className="h-4 w-4" />
+                Research Center
+              </Link>
+
               <Link
                 href="/amaravati/instructions"
                 className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"

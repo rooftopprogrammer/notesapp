@@ -144,5 +144,15 @@ service cloud.firestore {
     match /groceryItems/{document} {
       allow read, write: if true;
     }
+    
+    // Allow read and write access to the familyDietNotes collection
+    match /familyDietNotes/{document} {
+      allow read, write: if true;
+    }
+    
+    // Allow read and write access to the weightEntries collection
+    match /weightEntries/{document} {
+      allow read, write: if true;
+    }
   }
 }
