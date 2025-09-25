@@ -4,6 +4,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { Place, Visit } from '@/lib/types/amaravati';
 import { getAllPlaces, getVisitsByDateRange } from '@/lib/amaravati/firestore';
@@ -15,7 +16,8 @@ import {
   BarChart3, 
   Download, 
   RefreshCw,
-  TrendingUp
+  TrendingUp,
+  Video
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
@@ -190,6 +192,15 @@ export default function DashboardPage() {
               </div>
 
               {/* Action buttons */}
+              <Link
+                href="/amaravati/instructions"
+                className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+                title="Video Editing Instructions"
+              >
+                <Video className="h-4 w-4" />
+                Video Editing
+              </Link>
+
               <button
                 onClick={handleRefresh}
                 className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
