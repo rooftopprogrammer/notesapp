@@ -3,766 +3,698 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Plus, Edit3, Trash2, Calendar, TrendingUp, TrendingDown, Minus, Save, X, User, Scale } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import toast, { Toaster } from 'react-hot-toast';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot, 
-  orderBy, 
-  query, 
-  where,
-  serverTimestamp,
-  Timestamp 
-} from 'firebase/firestore';
+import { db } from '../../../lib/firebase';
+import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
+import toast from 'react-hot-toast';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 interface FamilyMember {
   id: string;
   name: string;
-  birthDate: string;
-  gender: 'male' | 'female' | 'other';
   height: number; // in cm
-  targetWeight?: number;
-  createdAt: Timestamp;
+  dateOfBirth: string;
 }
 
 interface WeightEntry {
   id: string;
   memberId: string;
-  memberName: string;
-  weight: number; // in kg
-  bmi?: number;
-  date: string; // YYYY-MM-DD format for Sunday dates
+  weight: number;
+  date: string;
   notes?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  bmi?: number;
+}
+
+const BMI_CATEGORIES = [
+  { range: 'Below 18.5', category: 'Underweight', color: 'text-blue-600' },
+  { range: '18.5 - 24.9', category: 'Normal weight', color: 'text-green-600' },
+  { range: '25.0 - 29.9', category: 'Overweight', color: 'text-yellow-600' },
+  { range: '30.0 and above', category: 'Obese', color: 'text-red-600' }
+];
+
+function calculateBMI(weight: number, height: number): number {
+  if (height <= 0) return 0;
+  const heightInMeters = height / 100;
+  return parseFloat((weight / (heightInMeters * heightInMeters)).toFixed(1));
+}
+
+function getBMICategory(bmi: number): { category: string; color: string } {
+  if (bmi < 18.5) return { category: 'Underweight', color: 'text-blue-600' };
+  if (bmi < 25) return { category: 'Normal weight', color: 'text-green-600' };
+  if (bmi < 30) return { category: 'Overweight', color: 'text-yellow-600' };
+  return { category: 'Obese', color: 'text-red-600' };
 }
 
 export default function WeightTracker() {
-  const [members, setMembers] = useState<FamilyMember[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [weightEntries, setWeightEntries] = useState<WeightEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isAddingMember, setIsAddingMember] = useState(false);
-  const [isAddingWeight, setIsAddingWeight] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<string>('');
+  const [showForm, setShowForm] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WeightEntry | null>(null);
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(getNextSunday());
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Member form state
-  const [memberForm, setMemberForm] = useState({
-    name: '',
-    birthDate: '',
-    gender: 'male' as 'male' | 'female' | 'other',
-    height: '',
-    targetWeight: ''
-  });
+  // Form states
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
+  const [memberName, setMemberName] = useState('');
+  const [memberDateOfBirth, setMemberDateOfBirth] = useState('');
 
-  // Weight form state
-  const [weightForm, setWeightForm] = useState({
-    memberId: '',
-    weight: '',
-    notes: ''
-  });
-
-  function getNextSunday(): string {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    const nextSunday = new Date(today);
-    nextSunday.setDate(today.getDate() + daysUntilSunday);
-    return nextSunday.toISOString().split('T')[0];
-  }
-
-  function calculateBMI(weight: number, height: number): number {
-    const heightInMeters = height / 100;
-    return Number((weight / (heightInMeters * heightInMeters)).toFixed(1));
-  }
-
-  function getWeightChange(entries: WeightEntry[], memberId: string, weeks: number): { change: number; percentage: number } {
-    const memberEntries = entries
-      .filter(entry => entry.memberId === memberId)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    if (memberEntries.length < 2) return { change: 0, percentage: 0 };
-
-    const latest = memberEntries[0];
-    const comparison = memberEntries.find((_, index) => index >= weeks - 1) || memberEntries[memberEntries.length - 1];
-    
-    const change = Number((latest.weight - comparison.weight).toFixed(1));
-    const percentage = Number(((change / comparison.weight) * 100).toFixed(1));
-    
-    return { change, percentage };
-  }
-
-  // Load family members
   useEffect(() => {
-    const q = query(collection(db, 'familyMembers'), orderBy('name'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const membersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as FamilyMember[];
-      setMembers(membersData);
-    });
+    // Load family members
+    const unsubscribeMembers = onSnapshot(
+      query(collection(db, 'familyMembers'), orderBy('name')),
+      (snapshot) => {
+        const members = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as FamilyMember));
+        setFamilyMembers(members);
+        
+        if (members.length > 0 && !selectedMember) {
+          setSelectedMember(members[0].id);
+        }
+      }
+    );
 
-    return () => unsubscribe();
-  }, []);
+    // Load weight entries
+    const unsubscribeEntries = onSnapshot(
+      query(collection(db, 'weightEntries'), orderBy('date', 'desc')),
+      (snapshot) => {
+        const entries = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as WeightEntry));
+        setWeightEntries(entries);
+        setLoading(false);
+      }
+    );
 
-  // Load weight entries
-  useEffect(() => {
-    const q = query(collection(db, 'weightEntries'), orderBy('date', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const entriesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as WeightEntry[];
-      setWeightEntries(entriesData);
-      setLoading(false);
-    });
+    return () => {
+      unsubscribeMembers();
+      unsubscribeEntries();
+    };
+  }, [selectedMember]);
 
-    return () => unsubscribe();
-  }, []);
-
-  const handleAddMember = async () => {
-    if (!memberForm.name.trim() || !memberForm.height) {
-      toast.error('Please fill in name and height');
-      return;
-    }
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberName.trim()) return;
 
     try {
       await addDoc(collection(db, 'familyMembers'), {
-        name: memberForm.name.trim(),
-        birthDate: memberForm.birthDate,
-        gender: memberForm.gender,
-        height: Number(memberForm.height),
-        targetWeight: memberForm.targetWeight ? Number(memberForm.targetWeight) : null,
-        createdAt: serverTimestamp()
+        name: memberName.trim(),
+        height: parseFloat(height) || 0,
+        dateOfBirth: memberDateOfBirth
       });
       
-      setMemberForm({
-        name: '',
-        birthDate: '',
-        gender: 'male',
-        height: '',
-        targetWeight: ''
-      });
-      setIsAddingMember(false);
-      toast.success('Family member added successfully!');
+      setMemberName('');
+      setHeight('');
+      setMemberDateOfBirth('');
+      toast.success('Family member added successfully');
     } catch (error) {
-      console.error('Error adding member:', error);
+      console.error('Error adding family member:', error);
       toast.error('Failed to add family member');
     }
   };
 
-  const handleAddWeight = async () => {
-    if (!weightForm.memberId || !weightForm.weight) {
-      toast.error('Please select member and enter weight');
+  const handleAddWeight = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedMember || !weight || !date) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    const member = members.find(m => m.id === weightForm.memberId);
+    const member = familyMembers.find(m => m.id === selectedMember);
     if (!member) {
-      toast.error('Member not found');
+      toast.error('Please select a family member');
       return;
     }
-
-    const weight = Number(weightForm.weight);
-    const bmi = calculateBMI(weight, member.height);
 
     try {
-      if (editingEntry) {
-        await updateDoc(doc(db, 'weightEntries', editingEntry.id), {
-          weight,
-          bmi,
-          notes: weightForm.notes.trim() || null,
-          updatedAt: serverTimestamp()
-        });
-        toast.success('Weight entry updated successfully!');
-      } else {
-        await addDoc(collection(db, 'weightEntries'), {
-          memberId: weightForm.memberId,
-          memberName: member.name,
-          weight,
-          bmi,
-          date: selectedDate,
-          notes: weightForm.notes.trim() || null,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-        toast.success('Weight entry added successfully!');
+      const weightValue = parseFloat(weight);
+      const heightValue = parseFloat(height) || member.height;
+
+      if (heightValue <= 0) {
+        toast.error('Height is required for BMI calculation');
+        return;
       }
-      
-      setWeightForm({
-        memberId: '',
-        weight: '',
-        notes: ''
+
+      // If member doesn't have height, update it
+      if (member.height === 0 || !member.height) {
+        await updateDoc(doc(db, 'familyMembers', member.id), {
+          height: heightValue
+        });
+      }
+
+      const bmi = calculateBMI(weightValue, heightValue);
+
+      await addDoc(collection(db, 'weightEntries'), {
+        memberId: selectedMember,
+        weight: weightValue,
+        date,
+        notes: notes.trim(),
+        bmi
       });
-      setIsAddingWeight(false);
-      setEditingEntry(null);
+      
+      // Reset form
+      setWeight('');
+      setHeight('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setNotes('');
+      setShowForm(false);
+      toast.success('Weight entry added successfully');
     } catch (error) {
-      console.error('Error saving weight entry:', error);
-      toast.error('Failed to save weight entry');
+      console.error('Error adding weight entry:', error);
+      toast.error('Failed to add weight entry');
     }
   };
 
-  const handleEditWeight = (entry: WeightEntry) => {
-    setEditingEntry(entry);
-    setWeightForm({
-      memberId: entry.memberId,
-      weight: entry.weight.toString(),
-      notes: entry.notes || ''
-    });
-    setSelectedDate(entry.date);
-    setIsAddingWeight(true);
-  };
+  const handleEditWeight = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingEntry || !weight || !date) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
-  const handleDeleteWeight = async (id: string) => {
-    if (confirm('Are you sure you want to delete this weight entry?')) {
-      setDeletingId(id);
-      try {
-        await deleteDoc(doc(db, 'weightEntries', id));
-        toast.success('Weight entry deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting weight entry:', error);
-        toast.error('Failed to delete weight entry');
-      } finally {
-        setDeletingId(null);
+    const member = familyMembers.find(m => m.id === editingEntry.memberId);
+    if (!member) {
+      toast.error('Family member not found');
+      return;
+    }
+
+    try {
+      const weightValue = parseFloat(weight);
+      const heightValue = parseFloat(height) || member.height;
+
+      if (heightValue <= 0) {
+        toast.error('Height is required for BMI calculation');
+        return;
       }
+
+      // Update member height if it has changed and member doesn't have height
+      if ((member.height === 0 || !member.height) && heightValue > 0) {
+        await updateDoc(doc(db, 'familyMembers', member.id), {
+          height: heightValue
+        });
+      }
+
+      const bmi = calculateBMI(weightValue, heightValue);
+
+      await updateDoc(doc(db, 'weightEntries', editingEntry.id), {
+        weight: weightValue,
+        date,
+        notes: notes.trim(),
+        bmi
+      });
+      
+      // Reset form
+      setWeight('');
+      setHeight('');
+      setDate(new Date().toISOString().split('T')[0]);
+      setNotes('');
+      setEditingEntry(null);
+      toast.success('Weight entry updated successfully');
+    } catch (error) {
+      console.error('Error updating weight entry:', error);
+      toast.error('Failed to update weight entry');
     }
   };
 
-  const handleCancel = () => {
-    setIsAddingMember(false);
-    setIsAddingWeight(false);
-    setEditingEntry(null);
-    setMemberForm({
-      name: '',
-      birthDate: '',
-      gender: 'male',
-      height: '',
-      targetWeight: ''
-    });
-    setWeightForm({
-      memberId: '',
-      weight: '',
-      notes: ''
-    });
+  const handleDeleteWeight = async (entryId: string) => {
+    if (!window.confirm('Are you sure you want to delete this weight entry?')) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'weightEntries', entryId));
+      toast.success('Weight entry deleted successfully');
+    } catch (error) {
+      console.error('Error deleting weight entry:', error);
+      toast.error('Failed to delete weight entry');
+    }
   };
 
-  const getMemberWeightData = (memberId: string) => {
-    return weightEntries
-      .filter(entry => entry.memberId === memberId)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(entry => ({
-        date: new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        weight: entry.weight,
-        bmi: entry.bmi
-      }));
+  const startEditEntry = (entry: WeightEntry) => {
+    const member = familyMembers.find(m => m.id === entry.memberId);
+    setEditingEntry(entry);
+    setWeight(entry.weight.toString());
+    setHeight(member?.height?.toString() || '');
+    setDate(entry.date);
+    setNotes(entry.notes || '');
+    setShowForm(false);
   };
+
+  const cancelEdit = () => {
+    setEditingEntry(null);
+    setWeight('');
+    setHeight('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setNotes('');
+  };
+
+  // Filter entries for selected member
+  const selectedMemberEntries = weightEntries
+    .filter(entry => entry.memberId === selectedMember)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  // Prepare chart data
+  const chartData = selectedMemberEntries.map(entry => ({
+    date: entry.date,
+    weight: entry.weight,
+    bmi: entry.bmi || 0
+  }));
+
+  // Get latest entry for selected member
+  const latestEntry = selectedMemberEntries[selectedMemberEntries.length - 1];
+  const selectedMemberData = familyMembers.find(m => m.id === selectedMember);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading weight tracker...</p>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg">
-              <span className="text-2xl">⚖️</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Family Weight Tracker
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Track weekly weight progress for all family members
-              </p>
-            </div>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <Link
+              href="/hometracker"
+              className="inline-flex items-center text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 mb-4"
+            >
+              ← Back to Family Tracker
+            </Link>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+              <Scale className="text-indigo-600 dark:text-indigo-400" />
+              Weight Tracker
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Track weight progress and BMI for your family
+            </p>
           </div>
-
-          <Link
-            href="/hometracker"
-            className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Home Tracker
-          </Link>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="mb-8 flex gap-4">
           <button
-            onClick={() => setIsAddingMember(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+            onClick={() => {
+              if (editingEntry) {
+                cancelEdit();
+              }
+              setShowForm(!showForm);
+            }}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 font-medium"
           >
-            <User className="w-5 h-5" />
-            Add Family Member
-          </button>
-          
-          <button
-            onClick={() => setIsAddingWeight(true)}
-            disabled={members.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition-colors"
-          >
-            <Scale className="w-5 h-5" />
+            <Plus size={20} />
             Add Weight Entry
           </button>
         </div>
 
-        {/* Add Member Form */}
-        {isAddingMember && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Add Family Member
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  value={memberForm.name}
-                  onChange={(e) => setMemberForm({...memberForm, name: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Birth Date
-                </label>
-                <input
-                  type="date"
-                  value={memberForm.birthDate}
-                  onChange={(e) => setMemberForm({...memberForm, birthDate: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Gender
-                </label>
-                <select
-                  value={memberForm.gender}
-                  onChange={(e) => setMemberForm({...memberForm, gender: e.target.value as 'male' | 'female' | 'other'})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Height (cm) *
-                </label>
-                <input
-                  type="number"
-                  value={memberForm.height}
-                  onChange={(e) => setMemberForm({...memberForm, height: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Target Weight (kg)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={memberForm.targetWeight}
-                  onChange={(e) => setMemberForm({...memberForm, targetWeight: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={handleAddMember}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                Save Member
-              </button>
-              
-              <button
-                onClick={handleCancel}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
-            </div>
+        {/* Family Member Selection */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Family Members</h2>
           </div>
-        )}
-
-        {/* Add Weight Form */}
-        {isAddingWeight && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              {editingEntry ? 'Edit Weight Entry' : 'Add Weight Entry'}
-            </h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Family Member *
-                </label>
-                <select
-                  value={weightForm.memberId}
-                  onChange={(e) => setWeightForm({...weightForm, memberId: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Select member...</option>
-                  {members.map(member => (
-                    <option key={member.id} value={member.id}>{member.name}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Weight (kg) *
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={weightForm.weight}
-                  onChange={(e) => setWeightForm({...weightForm, weight: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Date (Sunday) *
-                </label>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-              
-              <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Notes (optional)
-                </label>
-                <input
-                  type="text"
-                  value={weightForm.notes}
-                  onChange={(e) => setWeightForm({...weightForm, notes: e.target.value})}
-                  placeholder="Any additional notes..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-3 mt-6">
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {familyMembers.map((member) => (
               <button
-                onClick={handleAddWeight}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+                key={member.id}
+                onClick={() => setSelectedMember(member.id)}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  selectedMember === member.id
+                    ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300'
+                }`}
               >
-                <Save className="w-4 h-4" />
-                {editingEntry ? 'Update Entry' : 'Save Entry'}
-              </button>
-              
-              <button
-                onClick={handleCancel}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Family Members Overview */}
-        {members.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {members.map((member) => {
-              const memberEntries = weightEntries.filter(entry => entry.memberId === member.id);
-              const latestEntry = memberEntries
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-              
-              const weekChange = getWeightChange(weightEntries, member.id, 2);
-              const monthChange = getWeightChange(weightEntries, member.id, 5);
-              
-              return (
-                <div key={member.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/20 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">{member.name}</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Height: {member.height}cm</p>
+                <div className="flex items-center gap-3">
+                  <User size={20} className="text-indigo-600 dark:text-indigo-400" />
+                  <div className="text-left">
+                    <div className="font-medium text-gray-900 dark:text-white">{member.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {member.height > 0 ? `${member.height}cm` : 'Height not set'}
                     </div>
                   </div>
-                  
-                  {latestEntry ? (
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Current Weight:</span>
-                        <span className="font-semibold text-lg text-gray-900 dark:text-white">
-                          {latestEntry.weight} kg
-                        </span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">BMI:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {latestEntry.bmi}
-                        </span>
-                      </div>
-                      
-                      {weekChange.change !== 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Week Change:</span>
-                          <div className="flex items-center gap-1">
-                            {weekChange.change > 0 ? (
-                              <TrendingUp className="w-4 h-4 text-red-500" />
-                            ) : weekChange.change < 0 ? (
-                              <TrendingDown className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Minus className="w-4 h-4 text-gray-500" />
-                            )}
-                            <span className={`font-medium ${
-                              weekChange.change > 0 ? 'text-red-500' : 
-                              weekChange.change < 0 ? 'text-green-500' : 
-                              'text-gray-500'
-                            }`}>
-                              {weekChange.change > 0 ? '+' : ''}{weekChange.change} kg
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {monthChange.change !== 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Month Change:</span>
-                          <div className="flex items-center gap-1">
-                            {monthChange.change > 0 ? (
-                              <TrendingUp className="w-4 h-4 text-red-500" />
-                            ) : monthChange.change < 0 ? (
-                              <TrendingDown className="w-4 h-4 text-green-500" />
-                            ) : (
-                              <Minus className="w-4 h-4 text-gray-500" />
-                            )}
-                            <span className={`font-medium ${
-                              monthChange.change > 0 ? 'text-red-500' : 
-                              monthChange.change < 0 ? 'text-green-500' : 
-                              'text-gray-500'
-                            }`}>
-                              {monthChange.change > 0 ? '+' : ''}{monthChange.change} kg
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {member.targetWeight && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Target:</span>
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {member.targetWeight} kg
-                          </span>
-                        </div>
-                      )}
-                      
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Last updated: {new Date(latestEntry.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <p className="text-gray-500 dark:text-gray-400 text-sm">No weight entries yet</p>
-                      <button
-                        onClick={() => {
-                          setWeightForm({...weightForm, memberId: member.id});
-                          setIsAddingWeight(true);
-                        }}
-                        className="mt-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium"
-                      >
-                        Add first entry
-                      </button>
-                    </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Add New Member Form */}
+          <details className="group">
+            <summary className="cursor-pointer text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 font-medium">
+              + Add New Family Member
+            </summary>
+            <form onSubmit={handleAddMember} className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={memberName}
+                    onChange={(e) => setMemberName(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Height (cm)
+                  </label>
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                    placeholder="170"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={memberDateOfBirth}
+                    onChange={(e) => setMemberDateOfBirth(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="submit"
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Add Member
+                </button>
+              </div>
+            </form>
+          </details>
+        </div>
+
+        {/* Current Stats */}
+        {selectedMemberData && latestEntry && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Current Stats - {selectedMemberData.name}
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {latestEntry.weight} kg
+                </div>
+                <div className="text-gray-500 dark:text-gray-400">Current Weight</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {selectedMemberData.height} cm
+                </div>
+                <div className="text-gray-500 dark:text-gray-400">Height</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-3xl font-bold ${getBMICategory(latestEntry.bmi || 0).color}`}>
+                  {latestEntry.bmi || 0}
+                </div>
+                <div className="text-gray-500 dark:text-gray-400">BMI</div>
+                <div className={`text-sm ${getBMICategory(latestEntry.bmi || 0).color}`}>
+                  {getBMICategory(latestEntry.bmi || 0).category}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BMI Reference Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">BMI Categories</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {BMI_CATEGORIES.map((category, index) => (
+              <div key={index} className="text-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg">
+                <div className={`font-semibold ${category.color}`}>{category.category}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">{category.range}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Add/Edit Weight Form */}
+        {(showForm || editingEntry) && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {editingEntry ? 'Edit Weight Entry' : 'Add Weight Entry'}
+              </h2>
+              <button
+                onClick={editingEntry ? cancelEdit : () => setShowForm(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={editingEntry ? handleEditWeight : handleAddWeight}>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Weight (kg) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={weight}
+                    onChange={(e) => setWeight(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                    placeholder="70.5"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Height (cm) {selectedMemberData?.height ? '(optional)' : '*'}
+                  </label>
+                  <input
+                    type="number"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                    placeholder={selectedMemberData?.height?.toString() || "170"}
+                    disabled={Boolean(selectedMemberData?.height && selectedMemberData.height > 0)}
+                    required={!selectedMemberData?.height}
+                  />
+                  {selectedMemberData?.height && selectedMemberData.height > 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Height already set for this member
+                    </p>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Weight Progress Charts */}
-        {members.length > 0 && weightEntries.length > 0 && (
-          <div className="space-y-8 mb-8">
-            {members
-              .filter(member => weightEntries.some(entry => entry.memberId === member.id))
-              .map((member) => {
-                const data = getMemberWeightData(member.id);
-                if (data.length === 0) return null;
-
-                return (
-                  <div key={member.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      {member.name} - Weight Progress
-                    </h3>
-                    
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={data}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line 
-                            type="monotone" 
-                            dataKey="weight" 
-                            stroke="#6366f1" 
-                            strokeWidth={2}
-                            dot={{ fill: '#6366f1' }}
-                          />
-                          {member.targetWeight && (
-                            <Line
-                              type="monotone"
-                              dataKey={() => member.targetWeight}
-                              stroke="#10b981"
-                              strokeDasharray="5 5"
-                              strokeWidth={1}
-                              dot={false}
-                            />
-                          )}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        )}
-
-        {/* Recent Weight Entries */}
-        {weightEntries.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Recent Weight Entries
-            </h3>
-            
-            <div className="space-y-3">
-              {weightEntries.slice(0, 10).map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-white">
-                      {entry.memberName} - {entry.weight} kg
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {new Date(entry.date).toLocaleDateString()} • BMI: {entry.bmi}
-                      {entry.notes && ` • ${entry.notes}`}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditWeight(entry)}
-                      className="p-2 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-colors"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    
-                    <button
-                      onClick={() => handleDeleteWeight(entry.id)}
-                      disabled={deletingId === entry.id}
-                      className="p-2 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors disabled:opacity-50"
-                    >
-                      {deletingId === entry.id ? (
-                        <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                    required
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {members.length === 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="text-center py-16 px-6">
-              <div className="w-24 h-24 mx-auto mb-6 bg-indigo-100 dark:bg-indigo-900/20 rounded-full flex items-center justify-center">
-                <span className="text-4xl">⚖️</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
+                    placeholder="Optional notes"
+                  />
+                </div>
               </div>
               
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                No Family Members Yet
-              </h3>
-              
-              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                Start by adding family members to track their weekly weight progress and health journey.
-              </p>
-              
-              <button
-                onClick={() => setIsAddingMember(true)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
-              >
-                <User className="w-5 h-5" />
-                Add First Family Member
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <Save size={20} />
+                  {editingEntry ? 'Update Entry' : 'Add Entry'}
+                </button>
+                <button
+                  type="button"
+                  onClick={editingEntry ? cancelEdit : () => setShowForm(false)}
+                  className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors flex items-center gap-2"
+                >
+                  <X size={20} />
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Charts */}
+        {selectedMember && chartData.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* Weight Progress Chart */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <TrendingUp className="text-indigo-600 dark:text-indigo-400" />
+                Weight Progress
+              </h2>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis 
+                      dataKey="date" 
+                      className="text-xs"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      className="text-xs"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip 
+                      labelFormatter={(value) => `Date: ${value}`}
+                      formatter={(value, name) => [`${value} kg`, 'Weight']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="weight" 
+                      stroke="#4f46e5" 
+                      strokeWidth={3}
+                      dot={{ fill: '#4f46e5', strokeWidth: 2, r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+
+            {/* BMI Progress Chart */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <BarChart className="text-indigo-600 dark:text-indigo-400" />
+                BMI Progress
+              </h2>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis 
+                      dataKey="date" 
+                      className="text-xs"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis 
+                      className="text-xs"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip 
+                      labelFormatter={(value) => `Date: ${value}`}
+                      formatter={(value, name) => [value, 'BMI']}
+                    />
+                    <Bar 
+                      dataKey="bmi" 
+                      fill="#4f46e5"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Weight Entries List */}
+        {selectedMember && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Weight History - {familyMembers.find(m => m.id === selectedMember)?.name}
+            </h2>
+            
+            {selectedMemberEntries.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Scale size={48} className="mx-auto mb-4 opacity-30" />
+                <p>No weight entries found for this member.</p>
+                <p className="text-sm">Add your first weight entry to start tracking progress!</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200 dark:border-gray-600">
+                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Weight (kg)</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">BMI</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Category</th>
+                      <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">Notes</th>
+                      <th className="text-right py-3 px-4 font-medium text-gray-900 dark:text-white">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...selectedMemberEntries].reverse().map((entry) => {
+                      const bmiCategory = getBMICategory(entry.bmi || 0);
+                      return (
+                        <tr key={entry.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="py-3 px-4 text-gray-900 dark:text-white">
+                            <div className="flex items-center gap-2">
+                              <Calendar size={16} className="text-gray-400" />
+                              {new Date(entry.date).toLocaleDateString()}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-gray-900 dark:text-white font-medium">
+                            {entry.weight} kg
+                          </td>
+                          <td className="py-3 px-4 text-gray-900 dark:text-white font-medium">
+                            {entry.bmi || 0}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`${bmiCategory.color} font-medium`}>
+                              {bmiCategory.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                            {entry.notes || '-'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => startEditEntry(entry)}
+                                className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                title="Edit entry"
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteWeight(entry.id)}
+                                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                title="Delete entry"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
-      
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            style: {
-              background: '#10b981',
-            },
-          },
-          error: {
-            style: {
-              background: '#ef4444',
-            },
-          },
-        }}
-      />
     </div>
   );
 }
