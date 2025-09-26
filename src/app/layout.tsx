@@ -84,7 +84,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ThemeProvider>
-            <ThemeToggle />
+            {/* <ThemeToggle /> */}
             {children}
             <Toaster
               position="top-right"

@@ -85,45 +85,6 @@ export default function Home() {
 
       {/* Hero Section */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
-        <div className="text-center">
-          <div className="animate-fade-in-up">
-            <h1 className="text-6xl md:text-7xl font-black mb-6">
-              <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent animate-gradient-x">
-                Welcome to
-              </span>
-              <br />
-              <span className="bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent animate-gradient-x">
-                RNotes
-              </span>
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-4xl mx-auto leading-relaxed mb-12">
-              Your <span className="font-semibold text-indigo-600 dark:text-indigo-400">comprehensive productivity suite</span> for managing all aspects of your digital life with style and efficiency
-            </p>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto mb-16">
-            <div className="text-center animate-fade-in-up animation-delay-200">
-              <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                12+
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Apps</div>
-            </div>
-            <div className="text-center animate-fade-in-up animation-delay-400">
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                24/7
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Available</div>
-            </div>
-            <div className="text-center animate-fade-in-up animation-delay-600">
-              <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                100%
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Free</div>
-            </div>
-          </div>
-        </div>
-        
         {/* Modern App Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {/* Application Manager */}
@@ -476,21 +437,6 @@ export default function Home() {
               </div>
             </div>
           </Link>
-        </div>
-
-        {/* Footer Section */}
-        <div className="mt-20 text-center animate-fade-in-up animation-delay-2200">
-          <div className="inline-flex items-center px-6 py-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl rounded-full border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                All systems operational
-              </span>
-            </div>
-          </div>
-          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            Built with ❤️ for productivity enthusiasts
-          </p>
         </div>
       </div>
       
