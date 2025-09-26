@@ -13,6 +13,7 @@ interface FamilyMember {
   name: string;
   height: number; // in cm
   dateOfBirth: string;
+  age?: number; // calculated age
 }
 
 interface WeightEntry {
@@ -22,6 +23,65 @@ interface WeightEntry {
   date: string;
   notes?: string;
   bmi?: number;
+}
+
+// Predefined family member heights and birth years
+const PREDEFINED_HEIGHTS: { [key: string]: number } = {
+  'Ravi': 170.18, // 5'7" in cm
+  'Father': 175.26, // 5'9" in cm
+  'Mother': 165.10, // 5'5" in cm
+  'Brother': 180.34, // 5'11" in cm
+  'Wife': 170.18, // 5'7" in cm
+  'Wife (Breastfeeding)': 170.18, // 5'7" in cm
+  'Sister inlaw': 157.48, // 5'2" in cm
+  'Sister-In-law': 157.48, // 5'2" in cm
+  'Sister-in-law (Pregnant)': 157.48, // 5'2" in cm
+};
+
+const BIRTH_YEARS: { [key: string]: number } = {
+  'Brother': 1998,
+  'Ravi': 1996,
+  'Mother': 1974,
+  'Father': 1978,
+  'Wife': 2003,
+  'Wife (Breastfeeding)': 2003,
+  'Sister inlaw': 2001,
+  'Sister-In-law': 2001,
+  'Sister-in-law (Pregnant)': 2001,
+};
+
+// Helper function to get height by name
+function getHeightByName(name: string): number {
+  return PREDEFINED_HEIGHTS[name] || 0;
+}
+
+// Helper function to get birth year by name
+function getBirthYearByName(name: string): number {
+  return BIRTH_YEARS[name] || 0;
+}
+
+// Helper function to calculate age from birth year
+function calculateAge(birthYear: number): number {
+  if (birthYear <= 0) return 0;
+  return new Date().getFullYear() - birthYear;
+}
+
+// Helper function to convert cm to feet and inches
+function cmToFeetInches(cm: number): string {
+  if (cm <= 0) return '';
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return `${feet}'${inches}"`;
+}
+
+// Helper function to convert feet/inches string to cm
+function feetInchesToCm(feetInchesStr: string): number {
+  const match = feetInchesStr.match(/(\d+)'(\d+)"/);
+  if (!match) return 0;
+  const feet = parseInt(match[1]);
+  const inches = parseInt(match[2]);
+  return (feet * 12 + inches) * 2.54;
 }
 
 const BMI_CATEGORIES = [
@@ -101,16 +161,45 @@ export default function WeightTracker() {
     if (!memberName.trim()) return;
 
     try {
+      const predefinedHeight = getHeightByName(memberName.trim());
+      const predefinedBirthYear = getBirthYearByName(memberName.trim());
+      let finalHeight = predefinedHeight;
+      
+      // If no predefined height, try to parse user input
+      if (finalHeight <= 0) {
+        if (height.includes("'") && height.includes('"')) {
+          // Parse feet'inches" format
+          finalHeight = feetInchesToCm(height);
+        } else {
+          // Try to parse as number (assuming cm)
+          finalHeight = parseFloat(height) || 0;
+        }
+      }
+
+      // Use predefined birth year if available, otherwise use user input
+      let finalDateOfBirth = memberDateOfBirth;
+      if (predefinedBirthYear > 0 && !memberDateOfBirth) {
+        finalDateOfBirth = `${predefinedBirthYear}-01-01`; // Default to January 1st
+      }
+      
       await addDoc(collection(db, 'familyMembers'), {
         name: memberName.trim(),
-        height: parseFloat(height) || 0,
-        dateOfBirth: memberDateOfBirth
+        height: finalHeight,
+        dateOfBirth: finalDateOfBirth,
+        age: predefinedBirthYear > 0 ? calculateAge(predefinedBirthYear) : undefined
       });
       
       setMemberName('');
       setHeight('');
       setMemberDateOfBirth('');
-      toast.success('Family member added successfully');
+      
+      if (predefinedHeight > 0) {
+        toast.success(`Family member added with predefined height: ${cmToFeetInches(predefinedHeight)}`);
+      } else if (finalHeight > 0) {
+        toast.success(`Family member added with height: ${cmToFeetInches(finalHeight)}`);
+      } else {
+        toast.success('Family member added successfully');
+      }
     } catch (error) {
       console.error('Error adding family member:', error);
       toast.error('Failed to add family member');
@@ -133,7 +222,24 @@ export default function WeightTracker() {
 
     try {
       const weightValue = parseFloat(weight);
-      const heightValue = parseFloat(height) || member.height;
+      let heightValue = member.height;
+      
+      // Parse height input if provided
+      if (height.trim()) {
+        if (height.includes("'") && height.includes('"')) {
+          // Parse feet'inches" format
+          heightValue = feetInchesToCm(height);
+        } else {
+          // Try to parse as number (assuming cm)
+          heightValue = parseFloat(height) || member.height;
+        }
+      }
+      
+      // If still no height, try to get predefined height
+      if (heightValue <= 0) {
+        const predefinedHeight = getHeightByName(member.name);
+        heightValue = predefinedHeight;
+      }
 
       if (heightValue <= 0) {
         toast.error('Height is required for BMI calculation');
@@ -186,7 +292,24 @@ export default function WeightTracker() {
 
     try {
       const weightValue = parseFloat(weight);
-      const heightValue = parseFloat(height) || member.height;
+      let heightValue = member.height;
+      
+      // Parse height input if provided
+      if (height.trim()) {
+        if (height.includes("'") && height.includes('"')) {
+          // Parse feet'inches" format
+          heightValue = feetInchesToCm(height);
+        } else {
+          // Try to parse as number (assuming cm)
+          heightValue = parseFloat(height) || member.height;
+        }
+      }
+      
+      // If still no height, try to get predefined height
+      if (heightValue <= 0) {
+        const predefinedHeight = getHeightByName(member.name);
+        heightValue = predefinedHeight;
+      }
 
       if (heightValue <= 0) {
         toast.error('Height is required for BMI calculation');
@@ -240,7 +363,7 @@ export default function WeightTracker() {
     const member = familyMembers.find(m => m.id === entry.memberId);
     setEditingEntry(entry);
     setWeight(entry.weight.toString());
-    setHeight(member?.height?.toString() || '');
+    setHeight(member?.height ? cmToFeetInches(member.height) : '');
     setDate(entry.date);
     setNotes(entry.notes || '');
     setShowForm(false);
@@ -252,6 +375,114 @@ export default function WeightTracker() {
     setHeight('');
     setDate(new Date().toISOString().split('T')[0]);
     setNotes('');
+  };
+
+  const updateExistingMembersWithPredefinedHeights = async () => {
+    try {
+      const updates: Promise<void>[] = [];
+      const updateDetails: string[] = [];
+      
+      familyMembers.forEach(member => {
+        const predefinedHeight = getHeightByName(member.name);
+        console.log(`Checking member: "${member.name}", current height: ${member.height}, predefined: ${predefinedHeight}`);
+        
+        if (predefinedHeight > 0 && (!member.height || member.height === 0)) {
+          updates.push(
+            updateDoc(doc(db, 'familyMembers', member.id), {
+              height: predefinedHeight
+            })
+          );
+          updateDetails.push(`${member.name}: ${Math.round(predefinedHeight)}cm`);
+        }
+      });
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+        toast.success(`Updated heights for: ${updateDetails.join(', ')}`);
+      } else {
+        const memberNames = familyMembers.map(m => `"${m.name}"`).join(', ');
+        toast(`No updates needed. Current members: ${memberNames}. Check browser console for details.`, {
+          icon: 'ℹ️',
+          duration: 6000
+        });
+      }
+    } catch (error) {
+      console.error('Error updating member heights:', error);
+      toast.error('Failed to update member heights');
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!window.confirm(`Are you sure you want to remove ${memberName}? This will also delete all their weight entries.`)) {
+      return;
+    }
+
+    try {
+      // First, delete all weight entries for this member
+      const weightEntriesQuery = query(collection(db, 'weightEntries'), where('memberId', '==', memberId));
+      const weightEntriesSnapshot = await getDocs(weightEntriesQuery);
+      
+      const deleteWeightPromises = weightEntriesSnapshot.docs.map(doc => 
+        deleteDoc(doc.ref)
+      );
+      
+      // Delete the member
+      const deleteMemberPromise = deleteDoc(doc(db, 'familyMembers', memberId));
+      
+      // Execute all deletions
+      await Promise.all([...deleteWeightPromises, deleteMemberPromise]);
+      
+      // Reset selected member if it was the deleted one
+      if (selectedMember === memberId) {
+        setSelectedMember('');
+      }
+      
+      toast.success(`${memberName} and all their data have been removed`);
+    } catch (error) {
+      console.error('Error removing member:', error);
+      toast.error('Failed to remove member');
+    }
+  };
+
+  const recalculateAllBMI = async () => {
+    try {
+      const updates: Promise<void>[] = [];
+      let updatedCount = 0;
+
+      // Get all weight entries
+      const allEntriesSnapshot = await getDocs(collection(db, 'weightEntries'));
+      
+      for (const entryDoc of allEntriesSnapshot.docs) {
+        const entry = entryDoc.data() as WeightEntry;
+        const member = familyMembers.find(m => m.id === entry.memberId);
+        
+        if (member && member.height > 0) {
+          const newBMI = calculateBMI(entry.weight, member.height);
+          
+          // Update if BMI is missing or different
+          if (!entry.bmi || Math.abs(entry.bmi - newBMI) > 0.1) {
+            updates.push(
+              updateDoc(doc(db, 'weightEntries', entryDoc.id), {
+                bmi: newBMI
+              })
+            );
+            updatedCount++;
+          }
+        }
+      }
+
+      if (updates.length > 0) {
+        await Promise.all(updates);
+        toast.success(`Recalculated BMI for ${updatedCount} weight entries`);
+      } else {
+        toast('All BMI values are already up to date', {
+          icon: 'ℹ️'
+        });
+      }
+    } catch (error) {
+      console.error('Error recalculating BMI:', error);
+      toast.error('Failed to recalculate BMI');
+    }
   };
 
   // Filter entries for selected member
@@ -320,29 +551,71 @@ export default function WeightTracker() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Family Members</h2>
+            <div className="flex gap-2">
+              <button
+                onClick={updateExistingMembersWithPredefinedHeights}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                title="Update existing members with predefined heights"
+              >
+                <Scale size={16} />
+                Update Heights
+              </button>
+              <button
+                onClick={recalculateAllBMI}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                title="Recalculate BMI for all weight entries"
+              >
+                <TrendingUp size={16} />
+                Fix BMI
+              </button>
+            </div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {familyMembers.map((member) => (
-              <button
+              <div
                 key={member.id}
-                onClick={() => setSelectedMember(member.id)}
-                className={`p-4 rounded-lg border-2 transition-all ${
+                className={`relative p-4 rounded-lg border-2 transition-all ${
                   selectedMember === member.id
                     ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300'
+                    : 'border-gray-200 dark:border-gray-600'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedMember(member.id)}
+                  className="w-full h-full flex items-center gap-3 text-left"
+                >
                   <User size={20} className="text-indigo-600 dark:text-indigo-400" />
-                  <div className="text-left">
+                  <div>
                     <div className="font-medium text-gray-900 dark:text-white">{member.name}</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {member.height > 0 ? `${member.height}cm` : 'Height not set'}
+                      {member.height > 0 ? `${cmToFeetInches(member.height)} (${Math.round(member.height)}cm)` : 'Height not set'}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {(() => {
+                        const predefinedAge = calculateAge(getBirthYearByName(member.name));
+                        if (predefinedAge > 0) {
+                          return `Age: ${predefinedAge}`;
+                        } else if (member.dateOfBirth) {
+                          const age = new Date().getFullYear() - new Date(member.dateOfBirth).getFullYear();
+                          return age > 0 ? `Age: ${age}` : '';
+                        }
+                        return '';
+                      })()}
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveMember(member.id, member.name);
+                  }}
+                  className="absolute top-2 right-2 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                  title={`Remove ${member.name}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             ))}
           </div>
 
@@ -352,6 +625,22 @@ export default function WeightTracker() {
               + Add New Family Member
             </summary>
             <form onSubmit={handleAddMember} className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-200 font-medium mb-2">
+                  📏 Predefined Heights & Ages Available:
+                </p>
+                <div className="text-xs text-blue-700 dark:text-blue-300 grid grid-cols-1 gap-1">
+                  <div>• Ravi - 5'7" (170cm), Age: {calculateAge(1996)} (born 1996)</div>
+                  <div>• Father - 5'9" (175cm), Age: {calculateAge(1978)} (born 1978)</div>
+                  <div>• Mother - 5'5" (165cm), Age: {calculateAge(1974)} (born 1974)</div>
+                  <div>• Brother - 5'11" (180cm), Age: {calculateAge(1998)} (born 1998)</div>
+                  <div>• Wife / Wife (Breastfeeding) - 5'7" (170cm), Age: {calculateAge(2003)} (born 2003)</div>
+                  <div>• Sister-In-law / Sister-In-law (Pregnant) - 5'2" (157cm), Age: {calculateAge(2001)} (born 2001)</div>
+                </div>
+                <p className="text-xs text-blue-600 dark:text-blue-300 mt-2">
+                  💡 Use exact names above for automatic height and age assignment
+                </p>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -364,17 +653,22 @@ export default function WeightTracker() {
                     className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                     required
                   />
+                  {memberName && getHeightByName(memberName.trim()) > 0 && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      ✓ Height will be set automatically: {Math.round(getHeightByName(memberName.trim()))}cm
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Height (cm)
+                    Height (ft'in") {memberName && getHeightByName(memberName.trim()) > 0 ? '(optional - auto-filled)' : ''}
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
                     className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
-                    placeholder="170"
+                    placeholder="5'7&quot;"
                   />
                 </div>
                 <div>
@@ -416,9 +710,12 @@ export default function WeightTracker() {
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                  {selectedMemberData.height} cm
+                  {cmToFeetInches(selectedMemberData.height)}
                 </div>
                 <div className="text-gray-500 dark:text-gray-400">Height</div>
+                <div className="text-sm text-gray-400">
+                  {Math.round(selectedMemberData.height)}cm
+                </div>
               </div>
               <div className="text-center">
                 <div className={`text-3xl font-bold ${getBMICategory(latestEntry.bmi || 0).color}`}>
@@ -479,20 +776,20 @@ export default function WeightTracker() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Height (cm) {selectedMemberData?.height ? '(optional)' : '*'}
+                    Height (ft'in") {selectedMemberData?.height ? '(optional)' : '*'}
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
                     className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
-                    placeholder={selectedMemberData?.height?.toString() || "170"}
+                    placeholder={selectedMemberData?.height ? cmToFeetInches(selectedMemberData.height) : "5'7\""}
                     disabled={Boolean(selectedMemberData?.height && selectedMemberData.height > 0)}
                     required={!selectedMemberData?.height}
                   />
                   {selectedMemberData?.height && selectedMemberData.height > 0 && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Height already set for this member
+                      Height already set for this member: {cmToFeetInches(selectedMemberData.height)}
                     </p>
                   )}
                 </div>
