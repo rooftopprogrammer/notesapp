@@ -223,12 +223,12 @@ export default function ProductionApps() {
       
       <div className="min-h-screen relative overflow-hidden">
         {/* Animated Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 animate-gradient-x" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-cyan-900 animate-gradient-x" />
         
         {/* Floating Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-float" />
-          <div className="absolute top-40 right-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-float animation-delay-200" />
+          <div className="absolute top-20 left-20 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl animate-float" />
+          <div className="absolute top-40 right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-float animation-delay-200" />
           <div className="absolute bottom-20 left-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl animate-float animation-delay-400" />
         </div>
         
@@ -363,6 +363,7 @@ export default function ProductionApps() {
                                 rel="noopener noreferrer"
                                 className="text-blue-300 hover:text-blue-200 text-sm break-all hover:underline leading-relaxed transition-colors flex-1 group-hover:text-blue-200"
                               >
+                                {link}
                               </a>
                             </div>
                           ))}
