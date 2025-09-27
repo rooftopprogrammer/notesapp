@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseAvailable } from '@/lib/firebase';
 import { Project, Todo, TodoColumn } from '@/lib/types/todo';
-import { Plus, MoreHorizontal, Folder, Search, X } from 'lucide-react';
+import { Plus, MoreHorizontal, Folder, Search, X, Filter, Calendar, User, CheckCircle, Clock, AlertCircle, Zap, Target, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const defaultProjects: Project[] = [
@@ -40,7 +40,8 @@ const defaultProjects: Project[] = [
 const columns: TodoColumn[] = [
   { id: 'todo', title: 'To Do', color: 'border-gray-300', count: 0 },
   { id: 'inprogress', title: 'In Progress', color: 'border-orange-300', count: 0 },
-  { id: 'completed', title: 'Completed', color: 'border-green-300', count: 0 }
+  { id: 'completed', title: 'Completed', color: 'border-green-300', count: 0 },
+  { id: 'archived', title: 'Archived', color: 'border-gray-400', count: 0 }
 ];
 
 export default function TodoPage() {
@@ -51,8 +52,12 @@ export default function TodoPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+  const [draggedTodo, setDraggedTodo] = useState<Todo | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   
   const [projectForm, setProjectForm] = useState({
     name: '',
@@ -63,7 +68,7 @@ export default function TodoPage() {
   const [todoForm, setTodoForm] = useState({
     title: '',
     description: '',
-    status: 'todo' as 'todo' | 'inprogress' | 'completed',
+    status: 'todo' as 'todo' | 'inprogress' | 'completed' | 'archived',
     priority: 'medium' as 'low' | 'medium' | 'high',
     dueDate: ''
   });
@@ -99,12 +104,15 @@ export default function TodoPage() {
               setSelectedProject(defaultProjects[0]);
             }
           } else {
-            const projectsData = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              createdAt: doc.data().createdAt?.toDate() || new Date(),
-              updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-            })) as Project[];
+            const projectsData = snapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt || new Date()),
+                updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt || new Date()),
+              };
+            }) as Project[];
             setProjects(projectsData);
             if (!selectedProject && projectsData.length > 0) {
               setSelectedProject(projectsData[0]);
@@ -150,14 +158,18 @@ export default function TodoPage() {
       todosQuery,
       (snapshot) => {
         try {
-          const todosData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            dueDate: doc.data().dueDate?.toDate(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          })) as Todo[];
+          const todosData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              dueDate: data.dueDate?.toDate ? data.dueDate.toDate() : (data.dueDate || null),
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt || new Date()),
+              updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt || new Date()),
+            };
+          }) as Todo[];
           
+
           setTodos(todosData);
         } catch (err) {
           console.error('Error processing todos:', err);
@@ -175,6 +187,92 @@ export default function TodoPage() {
       unsubscribeTodos();
     };
   }, [selectedProject]);
+
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, todo: Todo) => {
+    setDraggedTodo(todo);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+    
+    // Add dragging class for visual feedback
+    setTimeout(() => {
+      (e.target as HTMLElement).classList.add('opacity-50');
+    }, 0);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedTodo(null);
+    setDragOverColumn(null);
+    (e.target as HTMLElement).classList.remove('opacity-50');
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverColumn(status);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only reset if we're leaving the column container, not child elements
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, newStatus: 'todo' | 'inprogress' | 'completed' | 'archived') => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    
+    if (!draggedTodo || draggedTodo.status === newStatus) {
+      setDraggedTodo(null);
+      return;
+    }
+
+    const originalStatus = draggedTodo.status; // Store original status for error rollback
+
+    console.log('🔄 Moving todo:', draggedTodo.title, 'from', originalStatus, 'to', newStatus);
+
+    try {
+      // Update local state optimistically first
+      setTodos(prevTodos => {
+        const updatedTodos = prevTodos.map(todo => 
+          todo.id === draggedTodo.id 
+            ? { ...todo, status: newStatus, updatedAt: new Date() }
+            : todo
+        );
+        console.log('✅ Optimistic update complete. New todos count:', updatedTodos.length);
+        return updatedTodos;
+      });
+
+      // Then update Firestore
+      const todoRef = doc(db, 'todos', draggedTodo.id);
+      await updateDoc(todoRef, {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      
+      console.log('🔥 Firestore update complete');
+      toast.success(`Todo moved to ${newStatus.replace('inprogress', 'in progress')}`);
+    } catch (error) {
+      console.error('Error updating todo status:', error);
+      toast.error('Failed to move todo');
+      
+      // Revert optimistic update on error
+      setTodos(prevTodos => 
+        prevTodos.map(todo => 
+          todo.id === draggedTodo.id 
+            ? { ...todo, status: originalStatus }
+            : todo
+        )
+      );
+    }
+    
+    setDraggedTodo(null);
+  };
 
   // Create new project
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -279,7 +377,8 @@ export default function TodoPage() {
   const todosByStatus = {
     todo: filteredTodos.filter(todo => todo.status === 'todo'),
     inprogress: filteredTodos.filter(todo => todo.status === 'inprogress'),
-    completed: filteredTodos.filter(todo => todo.status === 'completed')
+    completed: filteredTodos.filter(todo => todo.status === 'completed'),
+    archived: filteredTodos.filter(todo => todo.status === 'archived')
   };
 
   // Update column counts
@@ -327,169 +426,368 @@ export default function TodoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-slate-900">
+      {/* Modern Header with Gradient */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">To Do List</h1>
-              <p className="text-gray-600 dark:text-gray-400">Manage your tasks and projects</p>
+            <div className="flex items-center space-x-4">
+              <Link 
+                href="/" 
+                className="text-white/80 hover:text-white transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span className="text-sm font-medium">Back</span>
+              </Link>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white">Task Master</h1>
+                <p className="text-white/80">Organize your productivity journey</p>
+              </div>
             </div>
+            
+            {/* Stats Cards */}
+            <div className="hidden lg:flex items-center space-x-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
+                <div className="flex items-center space-x-2">
+                  <Target className="w-5 h-5 text-white" />
+                  <div>
+                    <div className="text-2xl font-bold text-white">{projects.length}</div>
+                    <div className="text-xs text-white/70">Projects</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-5 h-5 text-white" />
+                  <div>
+                    <div className="text-2xl font-bold text-white">{todos.filter(t => t.status === 'inprogress').length}</div>
+                    <div className="text-xs text-white/70">In Progress</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                  <div>
+                    <div className="text-2xl font-bold text-white">{todos.filter(t => t.status === 'completed').length}</div>
+                    <div className="text-xs text-white/70">Completed</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsProjectModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-white/10 backdrop-blur-sm text-white rounded-2xl hover:bg-white/20 transition-all duration-200 border border-white/20 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 <Folder className="w-4 h-4" />
-                New Project
+                <span className="hidden sm:inline">New Project</span>
               </button>
               <button
                 onClick={() => setIsTodoModalOpen(true)}
                 disabled={!selectedProject}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 rounded-2xl hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
               >
                 <Plus className="w-4 h-4" />
-                New Task
+                <span className="hidden sm:inline">New Task</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
-          {/* Sidebar - Projects */}
-          <div className="w-64 flex-shrink-0">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="font-semibold text-gray-900 dark:text-white">Projects</h2>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8">
+          {/* Modern Sidebar - Projects */}
+          <div className="w-80 flex-shrink-0">
+            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/50 overflow-hidden">
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white">Projects</h2>
+                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
+                    <span className="text-white text-sm font-medium">{projects.length}</span>
+                  </div>
+                </div>
               </div>
-              <div className="p-2">
+              <div className="p-4 space-y-2">
                 {projects.map(project => (
                   <button
                     key={project.id}
                     onClick={() => setSelectedProject(project)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                    className={`w-full group flex items-center gap-4 px-4 py-4 rounded-2xl text-left transition-all duration-200 ${
                       selectedProject?.id === project.id
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                        ? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 text-indigo-700 dark:text-indigo-300 shadow-lg border border-indigo-200 dark:border-indigo-700 transform scale-105'
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:shadow-md hover:transform hover:scale-102'
                     }`}
                   >
-                    <div className={`w-3 h-3 rounded-full ${project.color}`}></div>
-                    <span className="truncate">{project.name}</span>
+                    <div className={`w-4 h-4 rounded-full ${project.color} shadow-lg`}></div>
+                    <div className="flex-1">
+                      <span className="font-medium truncate block">{project.name}</span>
+                      {project.description && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate block mt-1">
+                          {project.description}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs bg-gray-100 dark:bg-gray-700 rounded-full px-2 py-1">
+                      {todos.filter(t => t.projectId === project.id).length}
+                    </div>
                   </button>
                 ))}
+              </div>
+              
+              {/* Quick Stats */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center p-2 bg-red-50 dark:bg-red-900/20 rounded-xl">
+                    <AlertCircle className="w-4 h-4 text-red-500 mx-auto mb-1" />
+                    <div className="text-xs font-medium text-red-600 dark:text-red-400">
+                      {todos.filter(t => t.status === 'todo').length}
+                    </div>
+                    <div className="text-xs text-red-500/70">To Do</div>
+                  </div>
+                  <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl">
+                    <Clock className="w-4 h-4 text-yellow-500 mx-auto mb-1" />
+                    <div className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
+                      {todos.filter(t => t.status === 'inprogress').length}
+                    </div>
+                    <div className="text-xs text-yellow-500/70">Doing</div>
+                  </div>
+                  <div className="text-center p-2 bg-green-50 dark:bg-green-900/20 rounded-xl">
+                    <CheckCircle className="w-4 h-4 text-green-500 mx-auto mb-1" />
+                    <div className="text-xs font-medium text-green-600 dark:text-green-400">
+                      {todos.filter(t => t.status === 'completed').length}
+                    </div>
+                    <div className="text-xs text-green-500/70">Done</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Main Content */}
+          {/* Modern Main Content */}
           <div className="flex-1">
             {selectedProject ? (
               <>
-                {/* Project Header */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full ${selectedProject.color}`}></div>
+                {/* Modern Project Header */}
+                <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/50 p-8 mb-8">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-16 h-16 rounded-2xl ${selectedProject.color} shadow-xl flex items-center justify-center`}>
+                        <Folder className="w-8 h-8 text-white" />
+                      </div>
                       <div>
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
                           {selectedProject.name}
                         </h2>
                         {selectedProject.description && (
-                          <p className="text-gray-600 dark:text-gray-400">{selectedProject.description}</p>
+                          <p className="text-gray-600 dark:text-gray-400 text-lg">{selectedProject.description}</p>
                         )}
+                        <div className="flex items-center gap-4 mt-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <Calendar className="w-4 h-4" />
+                            <span>Created {new Date(selectedProject.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <TrendingUp className="w-4 h-4" />
+                            <span>{todos.filter(t => t.projectId === selectedProject.id).length} tasks total</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {/* Search */}
+                    
+                    {/* Search and Filters */}
+                    <div className="flex items-center gap-4">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
                           type="text"
                           placeholder="Search tasks..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 pr-4 py-2 w-64 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="pl-12 pr-4 py-3 w-80 border border-gray-200 dark:border-gray-600 rounded-2xl bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent backdrop-blur-sm shadow-lg"
                         />
                       </div>
+                      <button className="p-3 bg-white/50 dark:bg-gray-700/50 rounded-2xl border border-gray-200 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 backdrop-blur-sm shadow-lg">
+                        <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Kanban Board */}
-                <div className="grid grid-cols-3 gap-6">
-                  {updatedColumns.map(column => (
-                    <div key={column.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                      {/* Column Header */}
-                      <div className={`border-t-4 ${column.color} rounded-t-lg p-4 border-b border-gray-200 dark:border-gray-700`}>
+                {/* Modern Kanban Board */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-8">
+                  {updatedColumns.map((column, index) => (
+                    <div 
+                      key={column.id} 
+                      className={`bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/50 overflow-hidden transition-all duration-200 ${
+                        dragOverColumn === column.id 
+                          ? 'border-blue-400 shadow-2xl shadow-blue-500/30 scale-105' 
+                          : ''
+                      }`}
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                      onDragOver={(e) => handleDragOver(e, column.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, column.id as 'todo' | 'inprogress' | 'completed' | 'archived')}
+                    >
+                      {/* Modern Column Header */}
+                      <div className={`bg-gradient-to-r ${
+                        column.id === 'todo' ? 'from-red-500 to-pink-500' :
+                        column.id === 'inprogress' ? 'from-yellow-500 to-orange-500' :
+                        column.id === 'completed' ? 'from-green-500 to-emerald-500' :
+                        'from-gray-500 to-slate-500'
+                      } p-6`}>
                         <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-gray-900 dark:text-white">{column.title}</h3>
-                          <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full text-sm">
-                            {column.count}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            {column.id === 'todo' && <AlertCircle className="w-6 h-6 text-white" />}
+                            {column.id === 'inprogress' && <Clock className="w-6 h-6 text-white" />}
+                            {column.id === 'completed' && <CheckCircle className="w-6 h-6 text-white" />}
+                            {column.id === 'archived' && (
+                              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                            )}
+                            <h3 className="text-xl font-bold text-white">{column.title}</h3>
+                          </div>
+                          <div className={`bg-white/20 backdrop-blur-sm rounded-full px-3 py-1 transition-all ${
+                            dragOverColumn === column.id ? 'animate-pulse scale-110' : ''
+                          }`}>
+                            <span className="text-white font-bold">{column.count}</span>
+                          </div>
+                          {dragOverColumn === column.id && (
+                            <div className="animate-bounce ml-2">
+                              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                              </svg>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Todo Items */}
-                      <div className="p-4 space-y-3 min-h-[400px]">
-                        {todosByStatus[column.id].map(todo => (
+                      {/* Modern Todo Items */}
+                      <div className="p-6 space-y-4 min-h-[500px]">
+                        {todosByStatus[column.id].map((todo, todoIndex) => (
                           <div
                             key={todo.id}
-                            className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg hover:shadow-md transition-shadow cursor-pointer group"
-                            onClick={() => openEditTodo(todo)}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, todo)}
+                            onDragEnd={handleDragEnd}
+                            className={`group relative ${
+                              todo.status === 'archived' 
+                                ? 'bg-gray-200/60 dark:bg-gray-800/60 opacity-75' 
+                                : 'bg-white/80 dark:bg-gray-700/80'
+                            } backdrop-blur-sm rounded-2xl p-5 border ${
+                              todo.status === 'archived'
+                                ? 'border-gray-300/40 dark:border-gray-600/40'
+                                : 'border-white/20 dark:border-gray-600/30'
+                            } hover:shadow-2xl hover:shadow-indigo-500/20 transition-all duration-300 cursor-move hover:transform hover:scale-105 select-none ${
+                              draggedTodo?.id === todo.id ? 'opacity-50 rotate-2 scale-105 shadow-2xl shadow-blue-500/50' : ''
+                            }`}
+                            onClick={(e) => {
+                              // Prevent click when dragging
+                              if (draggedTodo) return;
+                              setViewingTodo(todo);
+                              setIsViewModalOpen(true);
+                            }}
+                            style={{ animationDelay: `${todoIndex * 0.05}s` }}
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <h4 className="font-medium text-gray-900 dark:text-white text-sm">
-                                {todo.title}
-                              </h4>
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Priority Indicator */}
+                            <div className={`absolute top-0 left-0 w-1 h-full rounded-l-2xl ${
+                              todo.priority === 'high' ? 'bg-red-500' :
+                              todo.priority === 'medium' ? 'bg-yellow-500' :
+                              'bg-green-500'
+                            }`}></div>
+                            
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 dark:text-white text-base mb-1 line-clamp-2">
+                                  {todo.title}
+                                </h4>
+                                {todo.description && (
+                                  <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2 mb-3">
+                                    {todo.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditTodo(todo);
+                                  }}
+                                  className="p-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                  title="Edit todo"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <div className="cursor-move p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600" title="Drag to move">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                  </svg>
+                                </div>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     // Add menu options here
                                   }}
-                                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600"
                                 >
                                   <MoreHorizontal className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
-                            
-                            {todo.description && (
-                              <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
-                                {todo.description}
-                              </p>
-                            )}
 
-                            <div className="flex items-center justify-between">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                todo.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' :
-                                todo.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
-                                'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                              }`}>
-                                {todo.priority}
-                              </span>
+                            {/* Metadata */}
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                  todo.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                  todo.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                }`}>
+                                  {todo.priority === 'high' && <Zap className="w-3 h-3 mr-1" />}
+                                  {todo.priority === 'medium' && <AlertCircle className="w-3 h-3 mr-1" />}
+                                  {todo.priority === 'low' && <CheckCircle className="w-3 h-3 mr-1" />}
+                                  {todo.priority}
+                                </span>
+                                {todo.status === 'archived' && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                    </svg>
+                                    Archived
+                                  </span>
+                                )}
+                              </div>
                               
                               {todo.dueDate && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-600 px-2 py-1 rounded-lg">
+                                  <Calendar className="w-3 h-3" />
                                   {todo.dueDate.toLocaleDateString()}
-                                </span>
+                                </div>
                               )}
                             </div>
 
-                            {/* Status Change Buttons */}
-                            <div className="mt-3 flex gap-2">
+                            {/* Modern Action Buttons */}
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               {column.id !== 'todo' && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleUpdateTodoStatus(todo.id, 'todo');
                                   }}
-                                  className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                                  className="flex-1 text-xs px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors font-medium"
                                 >
-                                  Move to To Do
+                                  ← To Do
                                 </button>
                               )}
                               {column.id === 'todo' && (
@@ -498,9 +796,9 @@ export default function TodoPage() {
                                     e.stopPropagation();
                                     handleUpdateTodoStatus(todo.id, 'inprogress');
                                   }}
-                                  className="text-xs px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded hover:bg-orange-200 dark:hover:bg-orange-900/40"
+                                  className="flex-1 text-xs px-3 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-xl hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors font-medium"
                                 >
-                                  Start
+                                  ▶ Start
                                 </button>
                               )}
                               {column.id === 'inprogress' && (
@@ -509,9 +807,9 @@ export default function TodoPage() {
                                     e.stopPropagation();
                                     handleUpdateTodoStatus(todo.id, 'completed');
                                   }}
-                                  className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded hover:bg-green-200 dark:hover:bg-green-900/40"
+                                  className="flex-1 text-xs px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors font-medium"
                                 >
-                                  Complete
+                                  ✓ Complete
                                 </button>
                               )}
                               <button
@@ -519,32 +817,55 @@ export default function TodoPage() {
                                   e.stopPropagation();
                                   handleDeleteTodo(todo.id);
                                 }}
-                                className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/40"
+                                className="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                               >
-                                Delete
+                                <X className="w-3 h-3" />
                               </button>
                             </div>
                           </div>
                         ))}
+                        
+                        {/* Drop Zone Indicator */}
+                        {dragOverColumn === column.id && todosByStatus[column.id].length === 0 && (
+                          <div className="border-2 border-dashed border-blue-400 rounded-2xl p-8 text-center bg-blue-50/50 dark:bg-blue-900/20 animate-pulse">
+                            <div className="animate-bounce mb-2">
+                              <svg className="w-8 h-8 text-blue-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </div>
+                            <p className="text-blue-600 dark:text-blue-400 font-medium">Drop todo here</p>
+                          </div>
+                        )}
+                        
+                        {/* Add Task Button */}
+                        <button
+                          onClick={() => setIsTodoModalOpen(true)}
+                          className="w-full p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-2xl text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-500 transition-all duration-200 flex items-center justify-center gap-2 group"
+                        >
+                          <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                          <span className="font-medium">Add new task</span>
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
-                <Folder className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  No Project Selected
+              <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 dark:border-gray-700/50 p-16 text-center">
+                <div className="bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-3xl p-8 mb-8 inline-block">
+                  <Folder className="w-20 h-20 text-indigo-500 mx-auto" />
+                </div>
+                <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                  Ready to Get Organized?
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Select a project from the sidebar or create a new one to get started.
+                <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-md mx-auto">
+                  Select a project from the sidebar or create your first project to start managing your tasks like a pro.
                 </p>
                 <button
                   onClick={() => setIsProjectModalOpen(true)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg"
                 >
-                  Create New Project
+                  Create Your First Project
                 </button>
               </div>
             )}
@@ -695,12 +1016,13 @@ export default function TodoPage() {
                   </label>
                   <select
                     value={todoForm.status}
-                    onChange={(e) => setTodoForm({ ...todoForm, status: e.target.value as 'todo' | 'inprogress' | 'completed' })}
+                    onChange={(e) => setTodoForm({ ...todoForm, status: e.target.value as 'todo' | 'inprogress' | 'completed' | 'archived' })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="todo">To Do</option>
                     <option value="inprogress">In Progress</option>
                     <option value="completed">Completed</option>
+                    <option value="archived">Archived</option>
                   </select>
                 </div>
 
@@ -758,6 +1080,155 @@ export default function TodoPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Todo Modal */}
+      {isViewModalOpen && viewingTodo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-8 rounded-full ${
+                  viewingTodo.priority === 'high' ? 'bg-red-500' :
+                  viewingTodo.priority === 'medium' ? 'bg-yellow-500' :
+                  'bg-green-500'
+                }`}></div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {viewingTodo.title}
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      viewingTodo.status === 'todo' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                      viewingTodo.status === 'inprogress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      viewingTodo.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                      'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+                    }`}>
+                      {viewingTodo.status === 'todo' ? 'To Do' :
+                       viewingTodo.status === 'inprogress' ? 'In Progress' :
+                       viewingTodo.status === 'completed' ? 'Completed' : 'Archived'}
+                    </span>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                      viewingTodo.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                      viewingTodo.priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                    }`}>
+                      {viewingTodo.priority.charAt(0).toUpperCase() + viewingTodo.priority.slice(1)} Priority
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    openEditTodo(viewingTodo);
+                  }}
+                  className="p-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  title="Edit Todo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    setViewingTodo(null);
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {/* Description */}
+              {viewingTodo.description && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Description</h3>
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
+                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                      {viewingTodo.description}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Due Date */}
+              {viewingTodo.dueDate && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Due Date</h3>
+                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                    <Calendar className="w-5 h-5" />
+                    <span>{new Date(viewingTodo.dueDate).toLocaleDateString('en-US', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Created</h4>
+                  <p className="text-gray-900 dark:text-white">
+                    {viewingTodo.createdAt.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Updated</h4>
+                  <p className="text-gray-900 dark:text-white">
+                    {viewingTodo.updatedAt.toLocaleDateString('en-US', { 
+                      month: 'short', 
+                      day: 'numeric', 
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  setViewingTodo(null);
+                }}
+                className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setIsViewModalOpen(false);
+                  openEditTodo(viewingTodo);
+                }}
+                className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Todo
+              </button>
+            </div>
           </div>
         </div>
       )}
