@@ -5,7 +5,64 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DailyDietPlan } from '@/lib/types/diet-tracker';
 import { dailyDietPlanService, familyMemberService } from '@/lib/firebase/diet-tracker';
-import { formatDate, getMonthRange, extractMealDataFromPDF } from '@/lib/utils/diet-tracker-utils';
+import { formatDate, getMonthRange } from '@/lib/utils/diet-tracker-utils';
+import { extractPDFDataWithAI, aiExtractor } from '@/lib/ai/pdf-extractor';
+
+// AI Services Status Component
+const AIServicesStatus = () => {
+  const [aiStatus, setAiStatus] = useState<any>(null);
+
+  useEffect(() => {
+    setAiStatus(aiExtractor.getUsageStats());
+  }, []);
+
+  if (!aiStatus) return null;
+
+  const availableServices = aiStatus.services.filter((s: any) => s.enabled && s.hasApiKey);
+  const totalRemaining = availableServices.reduce((sum: number, s: any) => sum + s.remaining, 0);
+
+  return (
+    <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-700">
+      <div className="flex items-center gap-2 mb-2">
+        <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <h4 className="text-sm font-semibold text-purple-900 dark:text-purple-100">
+          AI-Enhanced Extraction
+        </h4>
+      </div>
+      
+      {availableServices.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs text-purple-700 dark:text-purple-300">
+            {availableServices.length} AI service{availableServices.length > 1 ? 's' : ''} configured • {totalRemaining} requests remaining
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {availableServices.map((service: any) => (
+              <span 
+                key={service.name}
+                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  service.remaining > 0 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                }`}
+              >
+                {service.name}: {service.remaining}/{service.limit}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs text-amber-700 dark:text-amber-300">
+          ⚠️ No AI services configured. Add API keys for better extraction.
+          <Link href="/settings" className="ml-1 underline hover:text-amber-800 dark:hover:text-amber-200">
+            Configure
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface CalendarDay {
   date: string;
@@ -219,22 +276,20 @@ export default function MealPlanningPage() {
         - Special nutrition for breastfeeding wife
       `;
       
-      // Step 2: Extract meal and family data
-      const extractedData = await extractMealDataFromPDF(samplePdfText);
+      // Step 2: Extract meal and family data using AI
+      const extractedData = await extractPDFDataWithAI(samplePdfText);
       console.log('Extracted data:', extractedData);
       console.log('Extracted meals:', extractedData.meals);
       console.log('Extracted family members:', extractedData.familyMembers);
       console.log('Extracted groceries:', extractedData.groceries);
 
       // Step 3: Process family members
-      setUploadProgress(prev => ({ 
-        ...prev, 
-        step: 'Processing family members...', 
+      setUploadProgress(prev => ({
+        ...prev,
+        step: `Processing family members... (${extractedData.extractionMethod})`,
         extractingFamily: true,
         extractingMeals: false
-      }));
-
-      let familyProcessingResult = null;
+      }));      let familyProcessingResult = null;
       if (extractedData.familyMembers && extractedData.familyMembers.length > 0) {
         familyProcessingResult = await familyMemberService.createOrUpdateFromPDF(extractedData.familyMembers);
         console.log('Family processing result:', familyProcessingResult);
@@ -258,7 +313,7 @@ export default function MealPlanningPage() {
           uploadedAt: new Date()
         },
         extractedData: {
-          meals: extractedData.meals.map((meal, index) => ({
+          meals: (extractedData.meals || []).map((meal: any, index: number) => ({
             id: `meal-${selectedDate}-${index}`,
             time: meal.time || '00:00',
             timeDisplay: meal.time ? 
@@ -274,7 +329,7 @@ export default function MealPlanningPage() {
                   meal.title?.toLowerCase().includes('drink') ? 'drink' as const : 'meal' as const,
             familyPortions: []
           })),
-          groceryList: extractedData.groceries.map((grocery, index) => ({
+          groceryList: (extractedData.groceries || []).map((grocery: any, index: number) => ({
             id: `grocery-${selectedDate}-${index}`,
             name: grocery.name || 'Unknown Item',
             category: grocery.category || 'condiments',
@@ -634,6 +689,11 @@ export default function MealPlanningPage() {
                 />
               </div>
 
+              {/* AI Services Status */}
+              <div className="md:col-span-2">
+                <AIServicesStatus />
+              </div>
+
               {/* File Upload */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -682,7 +742,7 @@ export default function MealPlanningPage() {
             {isUploading && (
               <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
                 <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-3">
-                  Processing PDF Upload
+                  Processing PDF Upload with AI Enhancement
                 </h4>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
