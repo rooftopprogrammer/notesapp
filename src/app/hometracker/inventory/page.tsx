@@ -117,6 +117,8 @@ export default function HomeInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
+  const [cardImageIndexes, setCardImageIndexes] = useState<{[key: string]: number}>({});
+  const [autoSlideIntervals, setAutoSlideIntervals] = useState<{[key: string]: NodeJS.Timeout}>({});
 
   const openImageViewer = (imageUrl: string) => {
     setCurrentImageUrl(imageUrl);
@@ -126,6 +128,21 @@ export default function HomeInventoryPage() {
   const closeImageViewer = () => {
     setImageViewerOpen(false);
     setCurrentImageUrl('');
+  };
+
+  // Image carousel functions
+  const nextImage = (itemId: string, imageCount: number) => {
+    setCardImageIndexes(prev => ({
+      ...prev,
+      [itemId]: ((prev[itemId] || 0) + 1) % imageCount
+    }));
+  };
+
+  const prevImage = (itemId: string, imageCount: number) => {
+    setCardImageIndexes(prev => ({
+      ...prev,
+      [itemId]: ((prev[itemId] || 0) - 1 + imageCount) % imageCount
+    }));
   };
 
   // Camera functions
@@ -197,6 +214,76 @@ export default function HomeInventoryPage() {
       }
     };
   }, [cameraStream]);
+
+  // Image carousel functions
+  const startAutoSlide = (itemId: string, imageCount: number) => {
+    if (imageCount <= 1) return;
+    
+    // Clear existing interval if any
+    if (autoSlideIntervals[itemId]) {
+      clearInterval(autoSlideIntervals[itemId]);
+    }
+    
+    const interval = setInterval(() => {
+      setCardImageIndexes(prev => ({
+        ...prev,
+        [itemId]: ((prev[itemId] || 0) + 1) % imageCount
+      }));
+    }, 3000); // Change image every 3 seconds
+    
+    setAutoSlideIntervals(prev => ({
+      ...prev,
+      [itemId]: interval
+    }));
+  };
+
+  const stopAutoSlide = (itemId: string) => {
+    if (autoSlideIntervals[itemId]) {
+      clearInterval(autoSlideIntervals[itemId]);
+      setAutoSlideIntervals(prev => {
+        const newIntervals = { ...prev };
+        delete newIntervals[itemId];
+        return newIntervals;
+      });
+    }
+  };
+
+  const goToNextImage = (itemId: string, imageCount: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    stopAutoSlide(itemId);
+    setCardImageIndexes(prev => ({
+      ...prev,
+      [itemId]: ((prev[itemId] || 0) + 1) % imageCount
+    }));
+    startAutoSlide(itemId, imageCount);
+  };
+
+  const goToPrevImage = (itemId: string, imageCount: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    stopAutoSlide(itemId);
+    setCardImageIndexes(prev => ({
+      ...prev,
+      [itemId]: ((prev[itemId] || 0) - 1 + imageCount) % imageCount
+    }));
+    startAutoSlide(itemId, imageCount);
+  };
+
+  const goToImage = (itemId: string, index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    stopAutoSlide(itemId);
+    setCardImageIndexes(prev => ({
+      ...prev,
+      [itemId]: index
+    }));
+    startAutoSlide(itemId, items.find(item => item.id === itemId)?.images?.length || 0);
+  };
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(autoSlideIntervals).forEach(interval => clearInterval(interval));
+    };
+  }, []);
 
   // Cloudinary deletion function
   const deleteFromCloudinary = async (imageUrl: string): Promise<boolean> => {
@@ -945,210 +1032,254 @@ export default function HomeInventoryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
             {filteredItems.map((item) => (
-              <div key={item.id} className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-[1.02] flex flex-col h-[380px] sm:h-[420px]">
-                {/* Image Display */}
+              <div 
+                key={item.id} 
+                className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 overflow-hidden group cursor-pointer"
+                onClick={() => {
+                  setDetailViewItem(item);
+                  setShowDetailView(true);
+                }}
+                onMouseEnter={() => {
+                  if (item.images && item.images.length > 1) {
+                    startAutoSlide(item.id, item.images.length);
+                  }
+                }}
+                onMouseLeave={() => {
+                  stopAutoSlide(item.id);
+                }}
+              >
+                {/* Image Carousel Section */}
                 {item.images && item.images.length > 0 ? (
-                  <div className="p-4 pb-0">
-                    <div className="grid grid-cols-2 gap-2">
-                      {item.images.slice(0, 4).map((imageUrl, index) => {
-                        console.log(`🖼️ Card Image ${index} for ${item.name}:`, imageUrl);
-                        return (
-                          <div 
-                            key={index} 
-                            className="relative cursor-pointer rounded-lg border-2 border-gray-300"
-                            style={{ 
-                              width: '100%', 
-                              height: '80px',
-                              backgroundColor: '#ffffff',
-                              overflow: 'hidden'
-                            }}
-                            onClick={() => {
-                              console.log('🖱️ Clicked image:', imageUrl);
-                              openImageViewer(imageUrl);
-                            }}
-                          >
-                            <img
-                              src={imageUrl}
-                              alt={`${item.name} ${index + 1}`}
-                              crossOrigin="anonymous"
-                              loading="eager"
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                display: 'block',
-                                border: 'none',
-                                outline: 'none',
-                                backgroundColor: 'transparent'
-                              }}
-                              onError={(e) => {
-                                console.error('❌ Image failed to load:', imageUrl);
-                                const target = e.target as HTMLImageElement;
-                                const container = target.parentElement;
-                                if (container) {
-                                  container.innerHTML = `
-                                    <div style="
-                                      width: 100%; 
-                                      height: 100%; 
-                                      display: flex; 
-                                      align-items: center; 
-                                      justify-content: center; 
-                                      background-color: #f3f4f6; 
-                                      color: #6b7280;
-                                      font-size: 12px;
-                                      flex-direction: column;
-                                    ">
-                                      <div style="font-size: 20px; margin-bottom: 4px;">📷</div>
-                                      <div>Failed</div>
-                                    </div>
-                                  `;
-                                }
-                              }}
-                              onLoad={(e) => {
-                                console.log('✅ Image successfully loaded:', imageUrl);
-                                const img = e.target as HTMLImageElement;
-                                console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-                                
-                                // Force redraw
-                                img.style.opacity = '0';
-                                setTimeout(() => {
-                                  img.style.opacity = '1';
-                                }, 10);
-                              }}
-                            />
-                            {item.images.length > 4 && index === 3 && (
-                              <div style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                fontSize: '14px',
-                                fontWeight: 'bold'
-                              }}>
-                                +{item.images.length - 4}
-                              </div>
-                            )}
-                            {/* Hover overlay */}
-                            <div 
-                              className="group-hover:bg-black group-hover:bg-opacity-20"
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                opacity: 0,
-                                transition: 'opacity 0.2s'
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.opacity = '1';
-                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.opacity = '0';
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }}
-                            >
-                              <svg width="24" height="24" fill="none" stroke="white" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  <div className="relative h-40 sm:h-48 overflow-hidden">
+                    {/* Main Image Display */}
+                    <div className="relative w-full h-full">
+                      <img
+                        src={item.images[cardImageIndexes[item.id] || 0]}
+                        alt={item.name}
+                        className="w-full h-full object-cover transition-opacity duration-300"
+                        crossOrigin="anonymous"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQgMTZsNC41ODYtNC41ODZhMiAyIDAgMDEyLjgyOCAwTDE2IDE2bS0yLTJsMS41ODYtMS41ODZhMiAyIDAgMDEyLjgyOCAwTDIwIDE0bS02LTZoLjAxTTYgMjBoMTJhMiAyIDAgMDAyLTJWNmEyIDIgMCAwMC0yLTJINmEyIDIgMCAwMC0yIDJ2MTJhMiAyIDAgMDAyIDJ6IiBzdHJva2U9IiM5Q0E3QjAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPg==';
+                        }}
+                      />
                     </div>
+
+                    {/* Image Indicators */}
+                    {item.images.length > 1 && (
+                      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
+                        {item.images.map((_, index) => (
+                          <div
+                            key={index}
+                            className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${ 
+                              index === (cardImageIndexes[item.id] || 0) 
+                                ? 'bg-white shadow-lg scale-125' 
+                                : 'bg-white/50'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Swipe Navigation (Mobile) */}
+                    {item.images.length > 1 && (
+                      <>
+                        <button
+                          className="absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all duration-200 opacity-0 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            prevImage(item.id, item.images.length);
+                          }}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                          </svg>
+                        </button>
+                        <button
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-black/20 hover:bg-black/40 rounded-full flex items-center justify-center text-white transition-all duration-200 opacity-0 group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            nextImage(item.id, item.images.length);
+                          }}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+
+                    {/* Category Badge */}
+                    <div className="absolute top-2 left-2">
+                      <div className="bg-black/70 text-white px-2 py-1 rounded-md flex items-center space-x-1">
+                        <span className="text-xs">{getCategoryIcon(item.category)}</span>
+                        <span className="text-xs font-medium">{item.category}</span>
+                      </div>
+                    </div>
+
+                    {/* Condition Badge */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${getConditionColor(item.condition)} backdrop-blur-sm`}>
+                        {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
+                      </span>
+                    </div>
+
+                    {/* Price Badge - Bottom Right */}
+                    {item.purchasePrice && (
+                      <div className="absolute bottom-2 right-2">
+                        <div className="bg-green-500 text-white px-2 py-1 rounded-md text-xs font-bold shadow-lg">
+                          ₹{item.purchasePrice.toLocaleString()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="p-4 pb-0">
-                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg h-20 flex items-center justify-center border-2 border-dashed border-gray-300">
-                      <div className="text-center">
-                        <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <p className="text-xs text-gray-500 font-medium">No Image</p>
+                  <div className="h-40 sm:h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-2">
+                        <span className="text-xl text-gray-500">{getCategoryIcon(item.category)}</span>
                       </div>
+                      <p className="text-sm text-gray-500 font-medium">No Image</p>
                     </div>
                   </div>
                 )}
-                
-                <div className="p-4 flex-1 flex flex-col">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-lg">{getCategoryIcon(item.category)}</span>
+
+                {/* Content Section */}
+                <div className="p-4">
+                  {/* Main Title - Always present */}
+                  <div className="mb-3">
+                    <h3 className="font-bold text-lg text-gray-900 mb-1 line-clamp-1">{item.name}</h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        {item.itemType ? (
+                          <span className="text-sm text-gray-600 bg-blue-50 px-2 py-1 rounded">{item.itemType}</span>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">No type specified</span>
+                        )}
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-gray-800 truncate">{item.name}</h3>
-                        <p className="text-xs text-gray-500">{item.category}</p>
-                        {item.itemType && (
-                          <p className="text-xs text-indigo-600 font-medium">{item.itemType}</p>
+                      <div className="ml-2">
+                        {item.purchasePrice ? (
+                          <span className="text-lg font-bold text-green-600">₹{item.purchasePrice.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-sm text-gray-400">No price</span>
                         )}
                       </div>
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium border flex-shrink-0 ${getConditionColor(item.condition)}`}>
-                      {item.condition.charAt(0).toUpperCase() + item.condition.slice(1)}
-                    </span>
                   </div>
 
-                  {(item.brand || item.model) && (
-                    <div className="mb-3">
-                      <p className="text-sm text-gray-600 truncate">
-                        {item.brand} {item.model}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="space-y-2 mb-4 flex-1">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Date:</span>
-                      <span className="text-gray-800 text-right">{new Date(item.purchaseDate).toLocaleDateString()}</span>
-                    </div>
-                    {item.purchasePrice && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Price:</span>
-                        <span className="text-gray-800 font-medium text-right">₹{item.purchasePrice.toLocaleString()}</span>
+                  {/* Brand & Model - Consistent height */}
+                  <div className="mb-2 p-2 bg-blue-50 rounded-lg border border-blue-100 min-h-[40px] flex items-center">
+                    {(item.brand || item.model) ? (
+                      <div className="flex items-center text-sm">
+                        <span className="text-blue-600 font-medium">{item.brand || 'No brand'}</span>
+                        {item.brand && item.model && <span className="mx-1 text-blue-400">•</span>}
+                        <span className="text-blue-600">{item.model || (item.brand ? '' : 'No model')}</span>
                       </div>
+                    ) : (
+                      <span className="text-sm text-blue-400 italic">Brand and model not specified</span>
                     )}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Location:</span>
-                      <span className="text-gray-800 text-right truncate ml-2">{item.location}</span>
+                  </div>
+
+                  {/* Location & Date - Always present */}
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="truncate max-w-20">{item.location}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>{new Date(item.purchaseDate).toLocaleDateString('en-GB')}</span>
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                    <div className="text-xs text-gray-500">
-                      Added {new Date(item.createdAt).toLocaleDateString()}
+                  {/* Additional Details - Consistent spacing */}
+                  <div className="space-y-2 mb-3">
+                    {/* Warranty - Always show section */}
+                    <div className="min-h-[28px] flex items-center">
+                      {item.warranty ? (
+                        <div className="w-full flex items-center justify-between text-xs">
+                          <span className="text-gray-500">Warranty:</span>
+                          <span className="bg-amber-50 text-amber-600 px-2 py-1 rounded font-medium">
+                            🛡️ {item.warranty}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="w-full text-xs text-gray-400 italic text-center">
+                          No warranty information
+                        </div>
+                      )}
                     </div>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => openDetailView(item)}
-                        className="text-indigo-600 hover:text-indigo-700 px-2 py-1 text-sm transition-colors rounded hover:bg-indigo-50"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => openEditModal(item)}
-                        className="text-slate-600 hover:text-slate-700 px-2 py-1 text-sm transition-colors rounded hover:bg-slate-50"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="text-red-500 hover:text-red-700 px-2 py-1 text-sm transition-colors rounded hover:bg-red-50"
-                      >
-                        Delete
-                      </button>
+
+                    {/* Serial Number - Reserve space */}
+                    <div className="min-h-[32px] flex items-center">
+                      {item.serialNumber ? (
+                        <div className="w-full text-xs text-gray-400 font-mono bg-gray-50 p-2 rounded">
+                          S/N: {item.serialNumber}
+                        </div>
+                      ) : (
+                        <div className="w-full text-xs text-gray-400 italic text-center p-2">
+                          No serial number
+                        </div>
+                      )}
                     </div>
+
+                    {/* Notes - Reserve space */}
+                    <div className="min-h-[48px] flex items-start">
+                      {item.notes ? (
+                        <div className="w-full text-xs text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-100 line-clamp-2">
+                          💭 {item.notes}
+                        </div>
+                      ) : (
+                        <div className="w-full text-xs text-gray-400 italic text-center p-2">
+                          No additional notes
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailViewItem(item);
+                        setShowDetailView(true);
+                      }}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center space-x-1"
+                    >
+                      <span>👁️</span>
+                      <span>View</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditModal(item);
+                      }}
+                      className="w-10 h-10 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                      title="Edit Item"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteItem(item.id);
+                      }}
+                      className="w-10 h-10 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                      title="Delete Item"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>
