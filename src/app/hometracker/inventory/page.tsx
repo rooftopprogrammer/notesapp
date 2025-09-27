@@ -22,6 +22,9 @@ interface InventoryItem {
   serialNumber?: string;
   notes?: string;
   images: string[];
+  workingQuantity: number;
+  expiredQuantity: number;
+  lastSeenPlace: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -93,6 +96,9 @@ export default function HomeInventoryPage() {
     condition: 'excellent' | 'good' | 'fair' | 'poor';
     serialNumber: string;
     notes: string;
+    workingQuantity: string;
+    expiredQuantity: string;
+    lastSeenPlace: string;
   }>({
     name: '',
     category: 'Electronics',
@@ -106,6 +112,9 @@ export default function HomeInventoryPage() {
     condition: 'excellent',
     serialNumber: '',
     notes: '',
+    workingQuantity: '1',
+    expiredQuantity: '0',
+    lastSeenPlace: '',
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -554,6 +563,9 @@ export default function HomeInventoryPage() {
             itemType: data.itemType || '',
             condition: data.condition || 'good',
             purchaseDate: data.purchaseDate || new Date().toISOString().split('T')[0],
+            workingQuantity: data.workingQuantity || 1,
+            expiredQuantity: data.expiredQuantity || 0,
+            lastSeenPlace: data.lastSeenPlace || data.location || '',
             createdAt: data.createdAt || new Date().toISOString(),
           } as InventoryItem;
           
@@ -610,6 +622,9 @@ export default function HomeInventoryPage() {
         condition: formData.condition,
         serialNumber: formData.serialNumber,
         notes: formData.notes,
+        workingQuantity: parseInt(formData.workingQuantity) || 1,
+        expiredQuantity: parseInt(formData.expiredQuantity) || 0,
+        lastSeenPlace: formData.lastSeenPlace.trim() || formData.location.trim(),
       };
 
       if (editingItem) {
@@ -662,6 +677,9 @@ export default function HomeInventoryPage() {
       condition: 'excellent',
       serialNumber: '',
       notes: '',
+      workingQuantity: '1',
+      expiredQuantity: '0',
+      lastSeenPlace: '',
     });
     setSelectedImages([]);
     setImagePreviewUrls([]);
@@ -698,6 +716,9 @@ export default function HomeInventoryPage() {
           condition: freshItemData.condition,
           serialNumber: freshItemData.serialNumber || '',
           notes: freshItemData.notes || '',
+          workingQuantity: freshItemData.workingQuantity?.toString() || '1',
+          expiredQuantity: freshItemData.expiredQuantity?.toString() || '0',
+          lastSeenPlace: freshItemData.lastSeenPlace || '',
         });
         
         // Set existing images from fresh data
@@ -726,6 +747,9 @@ export default function HomeInventoryPage() {
         condition: item.condition,
         serialNumber: item.serialNumber || '',
         notes: item.notes || '',
+        workingQuantity: item.workingQuantity?.toString() || '1',
+        expiredQuantity: item.expiredQuantity?.toString() || '0',
+        lastSeenPlace: item.lastSeenPlace || '',
       });
       
       const itemImages = item.images || [];
@@ -1241,6 +1265,43 @@ export default function HomeInventoryPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Quantity Information */}
+                    <div className="min-h-[40px] flex items-center">
+                      <div className="w-full bg-gradient-to-r from-green-50 to-blue-50 p-2 rounded border border-green-100">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-green-600 font-medium">✅ Working:</span>
+                              <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">
+                                {item.workingQuantity || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span className="text-red-600 font-medium">❌ Expired:</span>
+                              <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">
+                                {item.expiredQuantity || 0}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-blue-600 font-medium">📦 Total:</span>
+                            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">
+                              {(item.workingQuantity || 0) + (item.expiredQuantity || 0)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Last Seen Place */}
+                    {item.lastSeenPlace && item.lastSeenPlace !== item.location && (
+                      <div className="min-h-[28px] flex items-center">
+                        <div className="w-full text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-100">
+                          🔍 Last seen: <span className="font-medium">{item.lastSeenPlace}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
@@ -1519,7 +1580,49 @@ export default function HomeInventoryPage() {
                   placeholder="Serial number or ID"
                 />
               </div>
-              <div className="md:col-span-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Working Quantity</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.workingQuantity}
+                  onChange={(e) => setFormData({ ...formData, workingQuantity: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-colors"
+                  placeholder="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Expired Quantity</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.expiredQuantity}
+                  onChange={(e) => setFormData({ ...formData, expiredQuantity: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-colors"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Total Quantity</label>
+                <input
+                  type="number"
+                  value={(parseInt(formData.workingQuantity) || 0) + (parseInt(formData.expiredQuantity) || 0)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed transition-colors"
+                  placeholder="Auto-calculated"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Last Seen Place</label>
+                <input
+                  type="text"
+                  value={formData.lastSeenPlace}
+                  onChange={(e) => setFormData({ ...formData, lastSeenPlace: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-colors"
+                  placeholder="Where did you last see this item?"
+                />
+              </div>
+              <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
                 <textarea
                   value={formData.notes}
@@ -1865,6 +1968,46 @@ export default function HomeInventoryPage() {
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Quantity Information */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Quantity & Location</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">✅</div>
+                  <div className="text-sm text-green-600 font-medium mb-1">Working</div>
+                  <div className="text-2xl font-bold text-green-700">{detailViewItem.workingQuantity || 0}</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">❌</div>
+                  <div className="text-sm text-red-600 font-medium mb-1">Expired</div>
+                  <div className="text-2xl font-bold text-red-700">{detailViewItem.expiredQuantity || 0}</div>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl mb-2">📦</div>
+                  <div className="text-sm text-blue-600 font-medium mb-1">Total</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {(detailViewItem.workingQuantity || 0) + (detailViewItem.expiredQuantity || 0)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Last Seen Place */}
+              {detailViewItem.lastSeenPlace && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-orange-600">🔍</span>
+                    <span className="text-sm text-orange-600 font-medium">Last Seen:</span>
+                    <span className="text-orange-800 font-semibold">{detailViewItem.lastSeenPlace}</span>
+                  </div>
+                  {detailViewItem.lastSeenPlace !== detailViewItem.location && (
+                    <div className="mt-2 text-xs text-orange-600">
+                      (Current location: {detailViewItem.location})
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Notes */}
