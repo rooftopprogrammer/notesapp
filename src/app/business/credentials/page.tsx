@@ -288,7 +288,27 @@ export default function BusinessCredentials() {
 
   const copyToClipboard = (text: string, field: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      alert(`${field} copied to clipboard!`);
+      // Create a temporary toast notification
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-4 right-4 bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg z-50 animate-fade-in';
+      toast.innerHTML = `
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          ${field} copied to clipboard!
+        </div>
+      `;
+      document.body.appendChild(toast);
+      
+      // Remove toast after 2 seconds
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => document.body.removeChild(toast), 300);
+      }, 2000);
+    }).catch(() => {
+      alert(`Failed to copy ${field}. Please try again.`);
     });
   };
 
@@ -589,11 +609,11 @@ export default function BusinessCredentials() {
                     <div className="space-y-4">
                       <div className="group/field">
                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Username</label>
-                        <div className="flex items-center gap-3 p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50 group-hover/field:bg-slate-100/70 dark:group-hover/field:bg-slate-900/50 transition-all duration-300">
+                        <div className="flex items-center gap-3 p-4 bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 group-hover/field:bg-slate-100/80 dark:group-hover/field:bg-slate-900/60 transition-all duration-300 backdrop-blur-sm">
                           <span className="flex-1 text-sm text-slate-900 dark:text-white font-mono truncate">{credential.username}</span>
                           <button
                             onClick={() => copyToClipboard(credential.username, 'Username')}
-                            className="p-2 rounded-lg bg-white/50 dark:bg-slate-800/50 hover:bg-emerald-500 hover:text-white text-slate-400 hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md"
+                            className="group/copy p-2.5 rounded-xl bg-white/70 dark:bg-slate-800/70 hover:bg-emerald-500 hover:text-white text-slate-400 hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-lg backdrop-blur-sm"
                             title="Copy username"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -605,11 +625,11 @@ export default function BusinessCredentials() {
 
                       <div className="group/field">
                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Password</label>
-                        <div className="flex items-center gap-3 p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50 group-hover/field:bg-slate-100/70 dark:group-hover/field:bg-slate-900/50 transition-all duration-300">
+                        <div className="flex items-center gap-3 p-4 bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 group-hover/field:bg-slate-100/80 dark:group-hover/field:bg-slate-900/60 transition-all duration-300 backdrop-blur-sm">
                           <span className="flex-1 text-sm text-slate-900 dark:text-white font-mono truncate">{credential.password}</span>
                           <button
                             onClick={() => copyToClipboard(credential.password, 'Password')}
-                            className="p-2 rounded-lg bg-white/50 dark:bg-slate-800/50 hover:bg-emerald-500 hover:text-white text-slate-400 hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-md"
+                            className="group/copy p-2.5 rounded-xl bg-white/70 dark:bg-slate-800/70 hover:bg-emerald-500 hover:text-white text-slate-400 hover:scale-110 transition-all duration-300 shadow-sm hover:shadow-lg backdrop-blur-sm"
                             title="Copy password"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -622,15 +642,15 @@ export default function BusinessCredentials() {
                       {credential.siteLink && (
                         <div className="group/field">
                           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Site Link</label>
-                          <div className="p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50 group-hover/field:bg-slate-100/70 dark:group-hover/field:bg-slate-900/50 transition-all duration-300">
+                          <div className="p-4 bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 group-hover/field:bg-slate-100/80 dark:group-hover/field:bg-slate-900/60 transition-all duration-300 backdrop-blur-sm">
                             <a
                               href={credential.siteLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium group/link"
+                              className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium group/link transition-all duration-300"
                             >
                               <span className="truncate">{credential.siteLink}</span>
-                              <svg className="w-4 h-4 opacity-50 group-hover/link:opacity-100 transition-opacity duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 opacity-50 group-hover/link:opacity-100 group-hover/link:scale-110 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                               </svg>
                             </a>
@@ -677,17 +697,22 @@ export default function BusinessCredentials() {
                         )}
 
                         {credential.nextCycle && (
-                          <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/50 rounded-xl">
+                          <div className="p-5 bg-gradient-to-br from-slate-50/80 to-slate-100/60 dark:from-slate-900/60 dark:to-slate-800/60 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 backdrop-blur-sm">
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="text-sm font-medium text-slate-900 dark:text-white">Next Billing</div>
-                                <div className="text-sm text-slate-600 dark:text-slate-400">{credential.nextCycle.toLocaleDateString()}</div>
+                                <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                  <svg className="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  Next Billing
+                                </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">{credential.nextCycle.toLocaleDateString()}</div>
                               </div>
                               <div className="text-right">
-                                <div className={`text-lg font-bold ${getDaysUntilNextCycle(credential.nextCycle) <= 7 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white'}`}>
+                                <div className={`text-2xl font-bold ${getDaysUntilNextCycle(credential.nextCycle) <= 7 ? 'text-red-600 dark:text-red-400' : getDaysUntilNextCycle(credential.nextCycle) <= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
                                   {getDaysUntilNextCycle(credential.nextCycle)}
                                 </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">days left</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">days remaining</div>
                               </div>
                             </div>
                           </div>
@@ -697,9 +722,14 @@ export default function BusinessCredentials() {
 
                     {credential.notes && (
                       <div className="mt-6 pt-6 border-t border-slate-200/50 dark:border-slate-700/50">
-                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Notes</label>
-                        <div className="mt-2 p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-                          <p className="text-sm text-slate-600 dark:text-slate-400">{credential.notes}</p>
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-2 mb-3">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Notes
+                        </label>
+                        <div className="p-4 bg-gradient-to-br from-slate-50/70 to-slate-100/50 dark:from-slate-900/40 dark:to-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 backdrop-blur-sm">
+                          <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{credential.notes}</p>
                         </div>
                       </div>
                     )}
@@ -714,6 +744,20 @@ export default function BusinessCredentials() {
         )}
       </main>
 
+      {/* Floating Action Button */}
+      {credentials.length > 0 && (
+        <button
+          onClick={handleAdd}
+          className="fixed bottom-8 right-8 group bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 text-white p-4 rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 z-40"
+          title="Add new credential"
+        >
+          <div className="absolute inset-0 bg-white/20 rounded-full scale-0 group-hover:scale-100 transition-transform duration-500"></div>
+          <svg className="w-6 h-6 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
+
       {/* Custom CSS for animations */}
       <style jsx>{`
         @keyframes fade-in {
@@ -726,221 +770,384 @@ export default function BusinessCredentials() {
             transform: translateY(0);
           }
         }
+        
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        
         .animate-fade-in {
           animation: fade-in 0.6s ease-out forwards;
           opacity: 0;
+        }
+        
+        .animate-scale-in {
+          animation: scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgb(148 163 184) transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgb(148 163 184);
+          border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgb(100 116 139);
+        }
+        
+        .shadow-3xl {
+          box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.25);
         }
       `}</style>
 
       {/* Add/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                  {editingCredential ? 'Edit Credential' : 'Add New Credential'}
-                </h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-slate-700/50 w-full max-w-3xl max-h-[90vh] overflow-hidden transform animate-scale-in">
+            <div className="sticky top-0 bg-gradient-to-r from-emerald-600 to-cyan-600 p-6 text-white">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    {editingCredential ? 'Edit Credential' : 'Add New Credential'}
+                  </h2>
+                  <p className="text-emerald-100 text-sm mt-1">
+                    {editingCredential ? 'Update your credential information' : 'Secure your new credential details'}
+                  </p>
+                </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-all duration-300 hover:scale-110"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
+            </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Title */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                    placeholder="Enter credential title"
-                    required
-                  />
-                </div>
+            <div className="p-8 overflow-y-auto max-h-[calc(90vh-120px)] custom-scrollbar">
 
-                {/* Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Type *
-                  </label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    required
-                  >
-                    {CREDENTIAL_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Username and Password */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Username *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                      placeholder="Enter username"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Password *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                      placeholder="Enter password"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Site Link */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Site Link
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.siteLink}
-                    onChange={(e) => setFormData({...formData, siteLink: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                    placeholder="https://example.com"
-                  />
-                </div>
-
-                {/* Payment Options */}
-                <div>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.isPaid}
-                      onChange={(e) => setFormData({...formData, isPaid: e.target.checked})}
-                      className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">This is a paid service</span>
-                  </label>
-                </div>
-
-                {formData.isPaid && (
-                  <div className="space-y-4 pl-6 border-l-2 border-emerald-200 dark:border-emerald-800">
-                    {/* Amount and Currency */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Amount
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={formData.amount}
-                          onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                          placeholder="0.00"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Currency
-                        </label>
-                        <select
-                          value={formData.currency}
-                          onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        >
-                          {CURRENCIES.map(currency => (
-                            <option key={currency} value={currency}>{currency}</option>
-                          ))}
-                        </select>
-                      </div>
+              <form onSubmit={handleSubmit} className="space-y-8">
+                {/* Basic Information Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                     </div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Basic Information</h3>
+                  </div>
 
-                    {/* Next Cycle */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Next Billing Cycle
+                  {/* Title */}
+                  <div className="group">
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                      Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({...formData, title: e.target.value})}
+                      className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-500"
+                      placeholder="e.g., Apple iCloud, GitHub Pro, AWS Console"
+                      required
+                    />
+                  </div>
+
+                  {/* Type */}
+                  <div className="group">
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      Service Type *
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={formData.type}
+                        onChange={(e) => setFormData({...formData, type: e.target.value})}
+                        className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm text-slate-900 dark:text-white appearance-none cursor-pointer transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-500"
+                        required
+                      >
+                        {CREDENTIAL_TYPES.map(type => (
+                          <option key={type} value={type}>{type}</option>
+                        ))}
+                      </select>
+                      <svg className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Login Credentials Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Login Credentials</h3>
+                  </div>
+
+                  {/* Username and Password */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Username *
                       </label>
                       <input
-                        type="date"
-                        value={formData.nextCycle}
-                        onChange={(e) => setFormData({...formData, nextCycle: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        type="text"
+                        value={formData.username}
+                        onChange={(e) => setFormData({...formData, username: e.target.value})}
+                        className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 font-mono transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-500"
+                        placeholder="Enter username or email"
+                        required
                       />
                     </div>
 
-                    {/* Auto Debit */}
-                    <div>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={formData.autoDebit}
-                          onChange={(e) => setFormData({...formData, autoDebit: e.target.checked})}
-                          className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Auto-debit enabled</span>
+                    <div className="group">
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                        Password *
                       </label>
+                      <input
+                        type="text"
+                        value={formData.password}
+                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                        className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 font-mono transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-500"
+                        placeholder="Enter password"
+                        required
+                      />
                     </div>
                   </div>
-                )}
 
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Notes
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                    placeholder="Additional notes..."
-                  />
+                  {/* Site Link */}
+                  <div className="group">
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      Website URL
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.siteLink}
+                      onChange={(e) => setFormData({...formData, siteLink: e.target.value})}
+                      className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-500"
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Configuration Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Payment Configuration</h3>
+                  </div>
+
+                  {/* Payment Toggle */}
+                  <div className="group p-6 bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-700/50 rounded-2xl border border-slate-200/50 dark:border-slate-600/50 backdrop-blur-sm">
+                    <label className="flex items-center gap-4 cursor-pointer">
+                      <div className="relative">
+                        <input
+                          type="checkbox"
+                          checked={formData.isPaid}
+                          onChange={(e) => setFormData({...formData, isPaid: e.target.checked})}
+                          className="sr-only"
+                        />
+                        <div className={`w-14 h-8 rounded-full transition-all duration-300 ${formData.isPaid ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                          <div className={`w-6 h-6 bg-white rounded-full shadow-lg transform transition-all duration-300 mt-1 ${formData.isPaid ? 'translate-x-7' : 'translate-x-1'}`}></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">Paid Service</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Enable if this service requires payment</div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {formData.isPaid && (
+                    <div className="space-y-6 animate-fade-in">
+                      <div className="p-6 bg-gradient-to-br from-emerald-50/50 to-cyan-50/50 dark:from-emerald-900/20 dark:to-cyan-900/20 rounded-2xl border-2 border-emerald-200/50 dark:border-emerald-700/50 backdrop-blur-sm">
+                        {/* Amount and Currency */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                          <div className="group">
+                            <label className="block text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-3 flex items-center gap-2">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                              </svg>
+                              Amount per cycle
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formData.amount}
+                              onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                              className="w-full px-4 py-3 border-2 border-emerald-200 dark:border-emerald-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/70 dark:bg-slate-700/70 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 transition-all duration-300"
+                              placeholder="0.00"
+                            />
+                          </div>
+
+                          <div className="group">
+                            <label className="block text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-3 flex items-center gap-2">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                              </svg>
+                              Currency
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={formData.currency}
+                                onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                                className="w-full px-4 py-3 border-2 border-emerald-200 dark:border-emerald-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/70 dark:bg-slate-700/70 backdrop-blur-sm text-slate-900 dark:text-white appearance-none cursor-pointer transition-all duration-300"
+                              >
+                                {CURRENCIES.map(currency => (
+                                  <option key={currency} value={currency}>{currency}</option>
+                                ))}
+                              </select>
+                              <svg className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Next Cycle */}
+                        <div className="group mb-6">
+                          <label className="block text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-3 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            Next Billing Date
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.nextCycle}
+                            onChange={(e) => setFormData({...formData, nextCycle: e.target.value})}
+                            className="w-full px-4 py-3 border-2 border-emerald-200 dark:border-emerald-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/70 dark:bg-slate-700/70 backdrop-blur-sm text-slate-900 dark:text-white transition-all duration-300"
+                          />
+                        </div>
+
+                        {/* Auto Debit Toggle */}
+                        <div className="p-4 bg-white/60 dark:bg-slate-800/60 rounded-2xl border border-emerald-200/50 dark:border-emerald-600/50">
+                          <label className="flex items-center gap-4 cursor-pointer">
+                            <div className="relative">
+                              <input
+                                type="checkbox"
+                                checked={formData.autoDebit}
+                                onChange={(e) => setFormData({...formData, autoDebit: e.target.checked})}
+                                className="sr-only"
+                              />
+                              <div className={`w-12 h-7 rounded-full transition-all duration-300 ${formData.autoDebit ? 'bg-gradient-to-r from-emerald-500 to-emerald-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                <div className={`w-5 h-5 bg-white rounded-full shadow-lg transform transition-all duration-300 mt-1 ${formData.autoDebit ? 'translate-x-6' : 'translate-x-1'}`}></div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Auto-debit Enabled</div>
+                              <div className="text-xs text-emerald-600 dark:text-emerald-400">Automatic payment processing</div>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Notes Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Additional Notes</h3>
+                  </div>
+
+                  <div className="group">
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                      rows={4}
+                      className="w-full px-4 py-3 border-2 border-slate-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/50 dark:bg-slate-700/50 backdrop-blur-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 transition-all duration-300 group-hover:border-slate-300 dark:group-hover:border-slate-500 resize-none"
+                      placeholder="Additional information, recovery codes, or other important notes..."
+                    />
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-3 pt-6">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-6 py-2 rounded-md transition-colors flex items-center gap-2"
-                  >
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      editingCredential ? 'Update Credential' : 'Add Credential'
-                    )}
-                  </button>
+                <div className="sticky bottom-0 bg-gradient-to-r from-slate-50/95 to-white/95 dark:from-slate-800/95 dark:to-slate-700/95 backdrop-blur-xl p-6 -mx-8 -mb-8 mt-8 border-t border-slate-200/50 dark:border-slate-600/50 rounded-b-3xl">
+                  <div className="flex justify-end gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="px-6 py-3 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl transition-all duration-300 font-medium hover:scale-105"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="group relative overflow-hidden bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 disabled:from-emerald-400 disabled:to-cyan-400 text-white px-8 py-3 rounded-2xl font-medium transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl disabled:hover:scale-100 disabled:cursor-not-allowed"
+                    >
+                      <div className="absolute inset-0 bg-white/20 translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
+                      <div className="relative flex items-center gap-3">
+                        {saving ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={editingCredential ? "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" : "M12 4v16m8-8H4"} />
+                            </svg>
+                            {editingCredential ? 'Update Credential' : 'Create Credential'}
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
