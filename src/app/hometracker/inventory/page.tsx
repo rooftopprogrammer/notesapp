@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '../../../lib/firebase';
-import { collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, getDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { migrateLocalStorageToFirestore, checkLocalStorageForMigration } from './migration';
 
@@ -72,6 +72,8 @@ export default function HomeInventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedItemType, setSelectedItemType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,6 +114,19 @@ export default function HomeInventoryPage() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [showMigration, setShowMigration] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
+
+  const openImageViewer = (imageUrl: string) => {
+    setCurrentImageUrl(imageUrl);
+    setImageViewerOpen(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerOpen(false);
+    setCurrentImageUrl('');
+  };
 
   // Camera functions
   const startCamera = async () => {
@@ -183,6 +198,61 @@ export default function HomeInventoryPage() {
     };
   }, [cameraStream]);
 
+  // Cloudinary deletion function
+  const deleteFromCloudinary = async (imageUrl: string): Promise<boolean> => {
+    try {
+      console.log('🗑️ Starting deletion process for:', imageUrl);
+      
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      if (!cloudName) {
+        console.error('❌ Cloudinary cloud name not configured');
+        return false;
+      }
+
+      // Extract public_id from Cloudinary URL
+      const urlParts = imageUrl.split('/');
+      const uploadIndex = urlParts.findIndex(part => part === 'upload');
+      if (uploadIndex === -1) {
+        console.error('❌ Invalid Cloudinary URL format:', imageUrl);
+        return false;
+      }
+      
+      // Get the public_id (everything after version number, without extension)
+      const publicIdWithExtension = urlParts.slice(uploadIndex + 2).join('/');
+      const publicId = publicIdWithExtension.replace(/\.[^/.]+$/, ''); // Remove file extension
+      
+      console.log('📝 Extracted public_id:', publicId);
+      
+      // Use our server-side API endpoint for secure deletion
+      try {
+        const response = await fetch('/api/delete-image', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ publicId })
+        });
+        
+        const result = await response.json();
+        console.log('🔄 API Response:', { status: response.status, result });
+        
+        if (response.ok && result.success) {
+          console.log('✅ Image successfully deleted from Cloudinary:', publicId);
+          return true;
+        } else {
+          console.warn('⚠️ Cloudinary deletion failed:', result.message);
+          return false;
+        }
+      } catch (apiError) {
+        console.error('❌ Cloudinary API deletion failed:', apiError);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error in deleteFromCloudinary:', error);
+      return false;
+    }
+  };
+
   // Image upload function
   const uploadToCloudinary = async (file: File): Promise<string> => {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
@@ -218,6 +288,21 @@ export default function HomeInventoryPage() {
     }
   };
 
+  // Delete multiple images from Cloudinary
+  const deleteMultipleFromCloudinary = async (imageUrls: string[]): Promise<void> => {
+    if (imageUrls.length === 0) return;
+    
+    console.log('Deleting', imageUrls.length, 'images from Cloudinary');
+    const deletionPromises = imageUrls.map(url => deleteFromCloudinary(url));
+    
+    try {
+      await Promise.all(deletionPromises);
+      console.log('All images deleted from Cloudinary');
+    } catch (error) {
+      console.error('Error deleting some images from Cloudinary:', error);
+    }
+  };
+
   // Handle image selection
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -243,13 +328,130 @@ export default function HomeInventoryPage() {
   };
 
   // Remove image from preview
-  const removeImagePreview = (index: number) => {
-    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  const removeImagePreview = async (index: number) => {
+    const imageToRemove = imagePreviewUrls[index];
+    
+    console.log('🗑️ Removing image at index:', index);
+    console.log('📸 Image URL:', imageToRemove);
+    console.log('📂 Current existingImages:', existingImages);
+    console.log('🆕 Current selectedImages count:', selectedImages.length);
+    
+    // Check if this is an existing image (from Cloudinary) or a new local preview
+    const isExistingImage = existingImages.includes(imageToRemove);
+    console.log('🔍 Is existing image?', isExistingImage);
+    
+    if (isExistingImage) {
+      // If we're editing an item, update Firebase immediately
+      if (editingItem) {
+        console.log('✏️ Editing existing item:', editingItem.name);
+        try {
+          // Calculate updated images BEFORE updating state
+          const updatedImages = existingImages.filter(img => img !== imageToRemove);
+          console.log('📝 Updated images array:', updatedImages);
+          
+          // Delete from Cloudinary first
+          console.log('☁️ Attempting Cloudinary deletion...');
+          const deleted = await deleteFromCloudinary(imageToRemove);
+          console.log('☁️ Cloudinary deletion result:', deleted);
+          
+          // Update the item in Firebase to remove this image URL
+          console.log('🔥 Updating Firebase document...');
+          const itemRef = doc(db, 'homeInventory', editingItem.id);
+          await updateDoc(itemRef, {
+            images: updatedImages,
+            updatedAt: new Date().toISOString(),
+          });
+          console.log('✅ Firebase document updated successfully');
+          
+          // Update local state after successful Firebase update
+          setExistingImages(updatedImages);
+          
+          if (deleted) {
+            toast.success('Image deleted from cloud storage and database');
+          } else {
+            toast.success('Image removed from database (cloud deletion may have failed)');
+          }
+        } catch (error) {
+          console.error('❌ Failed to delete image:', error);
+          toast.error('Failed to delete image completely');
+          return; // Don't update UI state if database update failed
+        }
+      } else {
+        // For new items (not yet saved), just delete from Cloudinary and update local state
+        console.log('🆕 Deleting from new item (not yet saved)');
+        try {
+          await deleteFromCloudinary(imageToRemove);
+          setExistingImages(prev => prev.filter(img => img !== imageToRemove));
+          toast.success('Image deleted from cloud storage');
+        } catch (error) {
+          console.error('Failed to delete from Cloudinary:', error);
+          toast.error('Failed to delete image from cloud storage');
+          return;
+        }
+      }
+    } else {
+      // Remove from new images (local files) - find the correct index
+      const existingCount = existingImages.length;
+      const newImageIndex = index - existingCount;
+      console.log('🆕 Removing new image at adjusted index:', newImageIndex);
+      
+      if (newImageIndex >= 0 && newImageIndex < selectedImages.length) {
+        setSelectedImages(prev => prev.filter((_, i) => i !== newImageIndex));
+        console.log('✅ Removed from selectedImages');
+      }
+    }
+    
+    // Remove from preview URLs only after successful operations
     setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+    console.log('🖼️ Removed from preview URLs');
+  };
+
+  // Validate if image URL is still accessible
+  const validateImageUrl = async (url: string): Promise<boolean> => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  // Clean up broken image URLs from an item
+  const cleanupBrokenImages = async (item: InventoryItem) => {
+    if (!item.images || item.images.length === 0) return;
+    
+    const validImages: string[] = [];
+    let hasInvalidImages = false;
+    
+    for (const imageUrl of item.images) {
+      const isValid = await validateImageUrl(imageUrl);
+      if (isValid) {
+        validImages.push(imageUrl);
+      } else {
+        hasInvalidImages = true;
+        console.warn('Found broken image URL:', imageUrl);
+      }
+    }
+    
+    // Update Firebase if we found broken images
+    if (hasInvalidImages) {
+      try {
+        const itemRef = doc(db, 'homeInventory', item.id);
+        await updateDoc(itemRef, {
+          images: validImages,
+          updatedAt: new Date().toISOString(),
+        });
+        console.log(`Cleaned up ${item.images.length - validImages.length} broken images for item: ${item.name}`);
+      } catch (error) {
+        console.error('Failed to cleanup broken images:', error);
+      }
+    }
   };
 
   // Load items from Firestore with real-time updates
   useEffect(() => {
+    setLoading(true);
+    
     // Check for localStorage data that needs migration
     checkLocalStorageForMigration().then(hasData => {
       if (hasData) {
@@ -265,7 +467,7 @@ export default function HomeInventoryPage() {
         const inventoryItems: InventoryItem[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          inventoryItems.push({
+          const item = {
             id: doc.id,
             ...data,
             // Ensure all required fields exist with defaults
@@ -274,14 +476,33 @@ export default function HomeInventoryPage() {
             condition: data.condition || 'good',
             purchaseDate: data.purchaseDate || new Date().toISOString().split('T')[0],
             createdAt: data.createdAt || new Date().toISOString(),
-          } as InventoryItem);
+          } as InventoryItem;
+          
+          console.log(`📦 Loaded item: ${item.name}`, {
+            id: item.id,
+            images: item.images,
+            imageCount: item.images?.length || 0,
+            rawImageData: data.images
+          });
+          
+          inventoryItems.push(item);
         });
         setItems(inventoryItems);
-        console.log('Loaded', inventoryItems.length, 'items from Firestore');
+        setLoading(false);
+        console.log('✅ Loaded', inventoryItems.length, 'items from Firestore');
+        console.log('📊 Items with images:', inventoryItems.filter(item => item.images && item.images.length > 0).length);
+        
+        // Optional: Run cleanup for broken images in background (uncomment if needed)
+        // inventoryItems.forEach(item => {
+        //   if (item.images && item.images.length > 0) {
+        //     cleanupBrokenImages(item);
+        //   }
+        // });
       },
       (error) => {
         console.error('Error loading items from Firestore:', error);
         toast.error('Failed to load inventory items');
+        setLoading(false);
       }
     );
 
@@ -330,11 +551,19 @@ export default function HomeInventoryPage() {
       };
 
       if (editingItem) {
-        // Update existing item in Firestore
+        // Update existing item - combine existing images (that weren't deleted) with newly uploaded images
         const itemRef = doc(db, 'homeInventory', editingItem.id);
+        const finalImages = [...existingImages, ...uploadedImageUrls];
+        
+        console.log('📝 Saving item with images:', {
+          existingImages: existingImages,
+          newlyUploaded: uploadedImageUrls,
+          finalImages: finalImages
+        });
+        
         await updateDoc(itemRef, {
           ...itemData,
-          images: uploadedImageUrls.length > 0 ? uploadedImageUrls : editingItem.images,
+          images: finalImages,
           updatedAt: new Date().toISOString(),
         });
         toast.success('Item updated successfully!');
@@ -374,6 +603,8 @@ export default function HomeInventoryPage() {
     });
     setSelectedImages([]);
     setImagePreviewUrls([]);
+    setExistingImages([]);
+    setDeletingImageIndex(null);
     setEditingItem(null);
     setShowAddForm(false);
     setShowDetailView(false);
@@ -381,25 +612,66 @@ export default function HomeInventoryPage() {
     stopCamera();
   };
 
-  const openEditModal = (item: InventoryItem) => {
-    setEditingItem(item);
-    setFormData({
-      name: item.name,
-      category: item.category,
-      itemType: item.itemType || '',
-      brand: item.brand || '',
-      model: item.model || '',
-      purchaseDate: item.purchaseDate,
-      purchasePrice: item.purchasePrice?.toString() || '',
-      warranty: item.warranty || '',
-      location: item.location,
-      condition: item.condition,
-      serialNumber: item.serialNumber || '',
-      notes: item.notes || '',
-    });
-    setImagePreviewUrls(item.images || []);
-    setSelectedImages([]);
-    setShowAddForm(true);
+  const openEditModal = async (item: InventoryItem) => {
+    // Fetch fresh item data from Firestore to ensure we have the latest images
+    try {
+      const itemRef = doc(db, 'homeInventory', item.id);
+      const itemSnap = await getDoc(itemRef);
+      
+      if (itemSnap.exists()) {
+        const freshItemData = { id: itemSnap.id, ...itemSnap.data() } as InventoryItem;
+        console.log('🔄 Fresh item data loaded for editing:', freshItemData.name, 'Images:', freshItemData.images);
+        
+        setEditingItem(freshItemData);
+        setFormData({
+          name: freshItemData.name,
+          category: freshItemData.category,
+          itemType: freshItemData.itemType || '',
+          brand: freshItemData.brand || '',
+          model: freshItemData.model || '',
+          purchaseDate: freshItemData.purchaseDate,
+          purchasePrice: freshItemData.purchasePrice?.toString() || '',
+          warranty: freshItemData.warranty || '',
+          location: freshItemData.location,
+          condition: freshItemData.condition,
+          serialNumber: freshItemData.serialNumber || '',
+          notes: freshItemData.notes || '',
+        });
+        
+        // Set existing images from fresh data
+        const itemImages = freshItemData.images || [];
+        setExistingImages(itemImages);
+        setImagePreviewUrls(itemImages);
+        setSelectedImages([]);
+        setShowAddForm(true);
+      } else {
+        toast.error('Item not found');
+      }
+    } catch (error) {
+      console.error('Error fetching fresh item data:', error);
+      // Fallback to original item data if fetch fails
+      setEditingItem(item);
+      setFormData({
+        name: item.name,
+        category: item.category,
+        itemType: item.itemType || '',
+        brand: item.brand || '',
+        model: item.model || '',
+        purchaseDate: item.purchaseDate,
+        purchasePrice: item.purchasePrice?.toString() || '',
+        warranty: item.warranty || '',
+        location: item.location,
+        condition: item.condition,
+        serialNumber: item.serialNumber || '',
+        notes: item.notes || '',
+      });
+      
+      const itemImages = item.images || [];
+      setExistingImages(itemImages);
+      setImagePreviewUrls(itemImages);
+      setSelectedImages([]);
+      setShowAddForm(true);
+    }
   };
 
   const openDetailView = (item: InventoryItem) => {
@@ -408,13 +680,22 @@ export default function HomeInventoryPage() {
   };
 
   const deleteItem = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) {
+    if (!confirm('Are you sure you want to delete this item? This will also delete all associated images.')) {
       return;
     }
 
+    // Find the item to get its images
+    const itemToDelete = items.find(item => item.id === id);
+    
     try {
+      // Delete images from Cloudinary first
+      if (itemToDelete?.images && itemToDelete.images.length > 0) {
+        await deleteMultipleFromCloudinary(itemToDelete.images);
+      }
+      
+      // Then delete the item from Firestore
       await deleteDoc(doc(db, 'homeInventory', id));
-      toast.success('Item deleted successfully!');
+      toast.success('Item and all images deleted successfully!');
     } catch (error) {
       console.error('Error deleting item:', error);
       toast.error('Failed to delete item. Please try again.');
@@ -530,22 +811,121 @@ export default function HomeInventoryPage() {
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-gradient-to-r from-slate-600 to-gray-600 hover:from-slate-700 hover:to-gray-700 text-white px-6 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span>Add Item</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={async () => {
+                  console.log('🔍 DEBUG - Current state:');
+                  console.log('Items in database:', items.length);
+                  items.forEach((item, i) => {
+                    console.log(`Item ${i + 1} (${item.name}):`, {
+                      id: item.id,
+                      images: item.images,
+                      imageCount: item.images?.length || 0
+                    });
+                  });
+                  console.log('Edit mode - existingImages:', existingImages);
+                  console.log('Edit mode - imagePreviewUrls:', imagePreviewUrls);
+                  console.log('Edit mode - selectedImages:', selectedImages.length);
+                  
+                  // Test image URLs
+                  const itemsWithImages = items.filter(item => item.images && item.images.length > 0);
+                  if (itemsWithImages.length > 0) {
+                    const firstItem = itemsWithImages[0];
+                    const firstImageUrl = firstItem.images[0];
+                    console.log('🧪 Testing first image URL:', firstImageUrl);
+                    
+                    try {
+                      const response = await fetch(firstImageUrl, { method: 'HEAD' });
+                      console.log('📡 URL Response:', {
+                        status: response.status,
+                        ok: response.ok,
+                        headers: Object.fromEntries(response.headers.entries())
+                      });
+                    } catch (error) {
+                      console.error('🚫 URL Test Failed:', error);
+                    }
+                  }
+                  
+                  // Test API endpoint
+                  try {
+                    const testResponse = await fetch('/api/delete-image', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ publicId: 'test' })
+                    });
+                    const result = await testResponse.json();
+                    console.log('API Test Response:', { status: testResponse.status, result });
+                  } catch (e) {
+                    console.log('API Test Error:', e);
+                  }
+                }}
+                className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 text-sm"
+                title="Debug current state"
+              >
+                <span>🔍 Debug</span>
+              </button>
+              <button
+                onClick={async () => {
+                  setLoading(true);
+                  let cleanedCount = 0;
+                  for (const item of items) {
+                    if (item.images && item.images.length > 0) {
+                      const initialImageCount = item.images.length;
+                      await cleanupBrokenImages(item);
+                      // Check if images were cleaned (simplified check)
+                      const updatedItem = items.find(i => i.id === item.id);
+                      if (updatedItem && updatedItem.images.length < initialImageCount) {
+                        cleanedCount++;
+                      }
+                    }
+                  }
+                  setLoading(false);
+                  if (cleanedCount > 0) {
+                    toast.success(`Cleaned up broken images from ${cleanedCount} items`);
+                  } else {
+                    toast.success('All images are valid - no cleanup needed');
+                  }
+                }}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 text-sm"
+                title="Clean up broken image links"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Fix Images</span>
+              </button>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="bg-gradient-to-r from-slate-600 to-gray-600 hover:from-slate-700 hover:to-gray-700 text-white px-6 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <span>Add Item</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {loading ? (
+          <div className="flex items-center justify-center min-h-96">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-full mb-4">
+                <svg className="animate-spin w-8 h-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Loading Your Inventory</h3>
+              <p className="text-gray-500">Fetching your items from the cloud database...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div className="text-center">
               <div className="text-3xl font-bold text-slate-600 mb-2">{totalItems}</div>
@@ -674,27 +1054,136 @@ export default function HomeInventoryPage() {
             {filteredItems.map((item) => (
               <div key={item.id} className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-[1.02] flex flex-col h-[420px]">
                 {/* Image Display */}
-                {item.images && item.images.length > 0 && (
+                {item.images && item.images.length > 0 ? (
                   <div className="p-4 pb-0">
                     <div className="grid grid-cols-2 gap-2">
-                      {item.images.slice(0, 4).map((imageUrl, index) => (
-                        <div 
-                          key={index} 
-                          className="relative group cursor-pointer overflow-hidden rounded-lg"
-                          onClick={() => window.open(imageUrl, '_blank')}
-                        >
-                          <img
-                            src={imageUrl}
-                            alt={`${item.name} ${index + 1}`}
-                            className="w-full h-20 object-cover group-hover:scale-110 transition-transform duration-200"
-                          />
-                          {item.images.length > 4 && index === 3 && (
-                            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                              <span className="text-white font-semibold text-sm">+{item.images.length - 4}</span>
+                      {item.images.slice(0, 4).map((imageUrl, index) => {
+                        console.log(`🖼️ Card Image ${index} for ${item.name}:`, imageUrl);
+                        return (
+                          <div 
+                            key={index} 
+                            className="relative cursor-pointer rounded-lg border-2 border-gray-300"
+                            style={{ 
+                              width: '100%', 
+                              height: '80px',
+                              backgroundColor: '#ffffff',
+                              overflow: 'hidden'
+                            }}
+                            onClick={() => {
+                              console.log('🖱️ Clicked image:', imageUrl);
+                              openImageViewer(imageUrl);
+                            }}
+                          >
+                            <img
+                              src={imageUrl}
+                              alt={`${item.name} ${index + 1}`}
+                              crossOrigin="anonymous"
+                              loading="eager"
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                                border: 'none',
+                                outline: 'none',
+                                backgroundColor: 'transparent'
+                              }}
+                              onError={(e) => {
+                                console.error('❌ Image failed to load:', imageUrl);
+                                const target = e.target as HTMLImageElement;
+                                const container = target.parentElement;
+                                if (container) {
+                                  container.innerHTML = `
+                                    <div style="
+                                      width: 100%; 
+                                      height: 100%; 
+                                      display: flex; 
+                                      align-items: center; 
+                                      justify-content: center; 
+                                      background-color: #f3f4f6; 
+                                      color: #6b7280;
+                                      font-size: 12px;
+                                      flex-direction: column;
+                                    ">
+                                      <div style="font-size: 20px; margin-bottom: 4px;">📷</div>
+                                      <div>Failed</div>
+                                    </div>
+                                  `;
+                                }
+                              }}
+                              onLoad={(e) => {
+                                console.log('✅ Image successfully loaded:', imageUrl);
+                                const img = e.target as HTMLImageElement;
+                                console.log('Image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+                                
+                                // Force redraw
+                                img.style.opacity = '0';
+                                setTimeout(() => {
+                                  img.style.opacity = '1';
+                                }, 10);
+                              }}
+                            />
+                            {item.images.length > 4 && index === 3 && (
+                              <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                              }}>
+                                +{item.images.length - 4}
+                              </div>
+                            )}
+                            {/* Hover overlay */}
+                            <div 
+                              className="group-hover:bg-black group-hover:bg-opacity-20"
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                opacity: 0,
+                                transition: 'opacity 0.2s'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = '1';
+                                e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = '0';
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <svg width="24" height="24" fill="none" stroke="white" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 pb-0">
+                    <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg h-20 flex items-center justify-center border-2 border-dashed border-gray-300">
+                      <div className="text-center">
+                        <svg className="w-8 h-8 text-gray-400 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p className="text-xs text-gray-500 font-medium">No Image</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -772,6 +1261,8 @@ export default function HomeInventoryPage() {
               </div>
             ))}
           </div>
+        )}
+          </>
         )}
       </div>
 
@@ -1073,10 +1564,32 @@ export default function HomeInventoryPage() {
                           <button
                             type="button"
                             onClick={() => removeImagePreview(index)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                            disabled={deletingImageIndex === index}
+                            className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center text-xs rounded-full transition-colors ${
+                              deletingImageIndex === index 
+                                ? 'bg-gray-400 cursor-not-allowed' 
+                                : 'bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100'
+                            }`}
+                            title={deletingImageIndex === index ? 'Deleting...' : 'Delete image'}
                           >
-                            ×
+                            {deletingImageIndex === index ? (
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              '×'
+                            )}
                           </button>
+                          {/* Status indicator for existing vs new images */}
+                          <div className="absolute top-1 left-1">
+                            {existingImages.includes(url) ? (
+                              <span className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded text-[10px] font-medium">
+                                Saved
+                              </span>
+                            ) : (
+                              <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded text-[10px] font-medium">
+                                New
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1100,7 +1613,7 @@ export default function HomeInventoryPage() {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={!formData.name.trim() || !formData.location.trim() || uploadingImages}
+                disabled={!formData.name.trim() || !formData.location.trim() || uploadingImages || deletingImageIndex !== null}
                 className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none flex items-center space-x-2"
               >
                 {uploadingImages ? (
@@ -1110,6 +1623,14 @@ export default function HomeInventoryPage() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     <span>Uploading Images...</span>
+                  </>
+                ) : deletingImageIndex !== null ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Deleting Image...</span>
                   </>
                 ) : (
                   <span>{editingItem ? 'Update Item' : 'Add Item'}</span>
@@ -1168,16 +1689,88 @@ export default function HomeInventoryPage() {
                   {detailViewItem.images.map((imageUrl, index) => (
                     <div 
                       key={index} 
-                      className="relative group cursor-pointer overflow-hidden rounded-lg border border-gray-200"
-                      onClick={() => window.open(imageUrl, '_blank')}
+                      className="relative cursor-pointer rounded-lg border-2 border-gray-300"
+                      style={{ 
+                        width: '100%', 
+                        height: '128px',
+                        backgroundColor: '#ffffff',
+                        overflow: 'hidden'
+                      }}
+                      onClick={() => openImageViewer(imageUrl)}
                     >
                       <img
                         src={imageUrl}
                         alt={`${detailViewItem.name} ${index + 1}`}
-                        className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-200"
+                        crossOrigin="anonymous"
+                        loading="eager"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          display: 'block',
+                          border: 'none',
+                          outline: 'none',
+                          backgroundColor: 'transparent'
+                        }}
+                        onError={(e) => {
+                          console.error('❌ Detail view image failed to load:', imageUrl);
+                          const target = e.target as HTMLImageElement;
+                          const container = target.parentElement;
+                          if (container) {
+                            container.innerHTML = `
+                              <div style="
+                                width: 100%; 
+                                height: 100%; 
+                                display: flex; 
+                                align-items: center; 
+                                justify-content: center; 
+                                background-color: #f3f4f6; 
+                                color: #6b7280;
+                                font-size: 14px;
+                                flex-direction: column;
+                              ">
+                                <div style="font-size: 24px; margin-bottom: 8px;">📷</div>
+                                <div>Image Error</div>
+                              </div>
+                            `;
+                          }
+                        }}
+                        onLoad={(e) => {
+                          console.log('✅ Detail view image successfully loaded:', imageUrl);
+                          const img = e.target as HTMLImageElement;
+                          console.log('Detail image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+                          
+                          // Force redraw
+                          img.style.opacity = '0';
+                          setTimeout(() => {
+                            img.style.opacity = '1';
+                          }, 10);
+                        }}
                       />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-opacity duration-200 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {/* Hover overlay */}
+                      <div 
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: 0,
+                          transition: 'opacity 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '0';
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <svg width="32" height="32" fill="none" stroke="white" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                         </svg>
                       </div>
@@ -1363,6 +1956,41 @@ export default function HomeInventoryPage() {
             <p className="text-sm text-gray-500 text-center mt-4">
               Position your item within the frame and click capture
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {imageViewerOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeImageViewer();
+            }
+          }}
+        >
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={closeImageViewer}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors z-10"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={currentImageUrl}
+              alt="Full size view"
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onError={(e) => {
+                console.error('Full size image load error:', currentImageUrl);
+                (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMDAgMTAwQzE4MCAzMCAxNDAgNDAgMTQwIDYwUzE4MCA5MCAyMDAgMTAwUzI2MCA3MCAyNjAgNjBTMjIwIDMwIDIwMCAxMDBaIiBmaWxsPSIjOUNBM0FGIi8+CjxwYXRoIGQ9Ik0zNTAgNTBIMTAwQzc1IDUwIDUwIDc1IDUwIDEwMFYyMDBDNTAgMjI1IDc1IDI1MCAxMDAgMjUwSDMwMEMzMjUgMjUwIDM1MCAyMjUgMzUwIDIwMFYxMDBDMzUwIDc1IDMyNSA1MCAzMDAgNTBaTTMwMCAxMDBIMTAwVjIwMEgzMDBWMTAwWiIgZmlsbD0iIzlDQTNBRiIvPgo8dGV4dCB4PSIyMDAiIHk9IjE4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzlDQTNBRiIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0Ij5JbWFnZSBub3QgYXZhaWxhYmxlPC90ZXh0Pgo8L3N2Zz4=';
+              }}
+            />
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm bg-black bg-opacity-50 px-3 py-1 rounded">
+              Click outside to close
+            </div>
           </div>
         </div>
       )}
