@@ -154,5 +154,10 @@ service cloud.firestore {
     match /weightEntries/{document} {
       allow read, write: if true;
     }
+    
+    // Allow read and write access to the homeInventory collection
+    match /homeInventory/{document} {
+      allow read, write: if true;
+    }
   }
 }

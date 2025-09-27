@@ -82,6 +82,14 @@ const TRACKER_CATEGORIES = [
     color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400',
     examples: ['Weekly Weight', 'Family Progress', 'Weight Goals', 'BMI Tracking', 'Health Progress'],
     status: 'functional'
+  },
+  { 
+    id: 'inventory', 
+    name: 'Home Inventory', 
+    icon: '🏠', 
+    color: 'bg-slate-100 text-slate-800 dark:bg-slate-900/20 dark:text-slate-400',
+    examples: ['Monitor', 'Mobile', 'Kitchen Items', 'Electronics', 'Furniture'],
+    status: 'functional'
   }
 ];
 
