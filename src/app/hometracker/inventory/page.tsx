@@ -258,20 +258,13 @@ export default function HomeInventoryPage() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
     
-    console.log('🔍 Cloudinary Environment Check:', {
-      cloudName: cloudName ? `${cloudName.substring(0, 3)}***` : 'MISSING',
-      uploadPreset: uploadPreset ? `${uploadPreset.substring(0, 3)}***` : 'MISSING',
-      environment: process.env.NODE_ENV
-    });
-    
     if (!cloudName || !uploadPreset) {
       const missingVars = [];
       if (!cloudName) missingVars.push('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
       if (!uploadPreset) missingVars.push('NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET');
       
-      const errorMessage = `❌ Cloudinary configuration missing: ${missingVars.join(', ')}. Please check your environment variables in production deployment settings.`;
-      console.error(errorMessage);
-      toast.error(`Image upload failed: Missing Cloudinary configuration`);
+      const errorMessage = `Cloudinary configuration missing: ${missingVars.join(', ')}`;
+      toast.error('Image upload failed: Missing configuration');
       throw new Error(errorMessage);
     }
 
@@ -281,7 +274,6 @@ export default function HomeInventoryPage() {
     formData.append('folder', 'home-inventory');
 
     try {
-      console.log('📤 Uploading to Cloudinary...');
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         {
@@ -291,16 +283,12 @@ export default function HomeInventoryPage() {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Cloudinary upload failed:', response.status, errorText);
         throw new Error(`Failed to upload image: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('✅ Image uploaded successfully:', data.secure_url);
       return data.secure_url;
     } catch (error) {
-      console.error('❌ Error uploading image:', error);
       toast.error('Failed to upload image. Please try again.');
       throw error;
     }
@@ -310,14 +298,12 @@ export default function HomeInventoryPage() {
   const deleteMultipleFromCloudinary = async (imageUrls: string[]): Promise<void> => {
     if (imageUrls.length === 0) return;
     
-    console.log('Deleting', imageUrls.length, 'images from Cloudinary');
     const deletionPromises = imageUrls.map(url => deleteFromCloudinary(url));
     
     try {
       await Promise.all(deletionPromises);
-      console.log('All images deleted from Cloudinary');
     } catch (error) {
-      console.error('Error deleting some images from Cloudinary:', error);
+      // Silently handle errors - individual deletions may fail but that's okay
     }
   };
 
@@ -348,80 +334,70 @@ export default function HomeInventoryPage() {
   // Remove image from preview
   const removeImagePreview = async (index: number) => {
     const imageToRemove = imagePreviewUrls[index];
+    setDeletingImageIndex(index);
     
-    console.log('🗑️ Removing image at index:', index);
-    console.log('📸 Image URL:', imageToRemove);
-    console.log('📂 Current existingImages:', existingImages);
-    console.log('🆕 Current selectedImages count:', selectedImages.length);
-    
-    // Check if this is an existing image (from Cloudinary) or a new local preview
-    const isExistingImage = existingImages.includes(imageToRemove);
-    console.log('🔍 Is existing image?', isExistingImage);
-    
-    if (isExistingImage) {
-      // If we're editing an item, update Firebase immediately
-      if (editingItem) {
-        console.log('✏️ Editing existing item:', editingItem.name);
-        try {
-          // Calculate updated images BEFORE updating state
-          const updatedImages = existingImages.filter(img => img !== imageToRemove);
-          console.log('📝 Updated images array:', updatedImages);
-          
-          // Delete from Cloudinary first
-          console.log('☁️ Attempting Cloudinary deletion...');
-          const deleted = await deleteFromCloudinary(imageToRemove);
-          console.log('☁️ Cloudinary deletion result:', deleted);
-          
-          // Update the item in Firebase to remove this image URL
-          console.log('🔥 Updating Firebase document...');
-          const itemRef = doc(db, 'homeInventory', editingItem.id);
-          await updateDoc(itemRef, {
-            images: updatedImages,
-            updatedAt: new Date().toISOString(),
-          });
-          console.log('✅ Firebase document updated successfully');
-          
-          // Update local state after successful Firebase update
-          setExistingImages(updatedImages);
-          
-          if (deleted) {
-            toast.success('Image deleted from cloud storage and database');
-          } else {
-            toast.success('Image removed from database (cloud deletion may have failed)');
+    try {
+      // Check if this is an existing image (from Cloudinary) or a new local preview
+      const isExistingImage = existingImages.includes(imageToRemove);
+      
+      if (isExistingImage) {
+        // If we're editing an item, update Firebase immediately
+        if (editingItem) {
+          try {
+            // Calculate updated images BEFORE updating state
+            const updatedImages = existingImages.filter(img => img !== imageToRemove);
+            
+            // Delete from Cloudinary first
+            const deleted = await deleteFromCloudinary(imageToRemove);
+            
+            // Update the item in Firebase to remove this image URL
+            const itemRef = doc(db, 'homeInventory', editingItem.id);
+            await updateDoc(itemRef, {
+              images: updatedImages,
+              updatedAt: new Date().toISOString(),
+            });
+            
+            // Update local state after successful Firebase update
+            setExistingImages(updatedImages);
+            
+            if (deleted) {
+              toast.success('Image deleted from cloud storage and database');
+            } else {
+              toast.success('Image removed from database (cloud deletion may have failed)');
+            }
+          } catch (error) {
+            toast.error('Failed to delete image completely');
+            return; // Don't update UI state if database update failed
           }
-        } catch (error) {
-          console.error('❌ Failed to delete image:', error);
-          toast.error('Failed to delete image completely');
-          return; // Don't update UI state if database update failed
+        } else {
+          // For new items (not yet saved), just delete from Cloudinary and update local state
+          try {
+            await deleteFromCloudinary(imageToRemove);
+            setExistingImages(prev => prev.filter(img => img !== imageToRemove));
+            toast.success('Image deleted from cloud storage');
+          } catch (error) {
+            toast.error('Failed to delete image from cloud storage');
+            return;
+          }
         }
       } else {
-        // For new items (not yet saved), just delete from Cloudinary and update local state
-        console.log('🆕 Deleting from new item (not yet saved)');
-        try {
-          await deleteFromCloudinary(imageToRemove);
-          setExistingImages(prev => prev.filter(img => img !== imageToRemove));
-          toast.success('Image deleted from cloud storage');
-        } catch (error) {
-          console.error('Failed to delete from Cloudinary:', error);
-          toast.error('Failed to delete image from cloud storage');
-          return;
+        // Remove from new images (local files) - find the correct index
+        const existingCount = existingImages.length;
+        const newImageIndex = index - existingCount;
+        
+        if (newImageIndex >= 0 && newImageIndex < selectedImages.length) {
+          setSelectedImages(prev => prev.filter((_, i) => i !== newImageIndex));
         }
       }
-    } else {
-      // Remove from new images (local files) - find the correct index
-      const existingCount = existingImages.length;
-      const newImageIndex = index - existingCount;
-      console.log('🆕 Removing new image at adjusted index:', newImageIndex);
       
-      if (newImageIndex >= 0 && newImageIndex < selectedImages.length) {
-        setSelectedImages(prev => prev.filter((_, i) => i !== newImageIndex));
-        console.log('✅ Removed from selectedImages');
-      }
+      // Remove from preview URLs only after successful operations
+      setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+      
+    } catch (error) {
+      toast.error('Failed to remove image');
+    } finally {
+      setDeletingImageIndex(null);
     }
-    
-    // Remove from preview URLs only after successful operations
-    setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
-    console.log('🖼️ Removed from preview URLs');
   };
 
   // Validate if image URL is still accessible
@@ -447,7 +423,6 @@ export default function HomeInventoryPage() {
         validImages.push(imageUrl);
       } else {
         hasInvalidImages = true;
-        console.warn('Found broken image URL:', imageUrl);
       }
     }
     
@@ -459,9 +434,8 @@ export default function HomeInventoryPage() {
           images: validImages,
           updatedAt: new Date().toISOString(),
         });
-        console.log(`Cleaned up ${item.images.length - validImages.length} broken images for item: ${item.name}`);
       } catch (error) {
-        console.error('Failed to cleanup broken images:', error);
+        // Silently handle cleanup errors
       }
     }
   };
@@ -496,29 +470,12 @@ export default function HomeInventoryPage() {
             createdAt: data.createdAt || new Date().toISOString(),
           } as InventoryItem;
           
-          console.log(`📦 Loaded item: ${item.name}`, {
-            id: item.id,
-            images: item.images,
-            imageCount: item.images?.length || 0,
-            rawImageData: data.images
-          });
-          
           inventoryItems.push(item);
         });
         setItems(inventoryItems);
         setLoading(false);
-        console.log('✅ Loaded', inventoryItems.length, 'items from Firestore');
-        console.log('📊 Items with images:', inventoryItems.filter(item => item.images && item.images.length > 0).length);
-        
-        // Optional: Run cleanup for broken images in background (uncomment if needed)
-        // inventoryItems.forEach(item => {
-        //   if (item.images && item.images.length > 0) {
-        //     cleanupBrokenImages(item);
-        //   }
-        // });
       },
       (error) => {
-        console.error('Error loading items from Firestore:', error);
         toast.error('Failed to load inventory items');
         setLoading(false);
       }
@@ -943,7 +900,7 @@ export default function HomeInventoryPage() {
         ) : (
           <>
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <div className="text-center">
               <div className="text-3xl font-bold text-slate-600 mb-2">{totalItems}</div>
@@ -1068,9 +1025,9 @@ export default function HomeInventoryPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
             {filteredItems.map((item) => (
-              <div key={item.id} className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-[1.02] flex flex-col h-[420px]">
+              <div key={item.id} className="bg-white/70 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-200 hover:transform hover:scale-[1.02] flex flex-col h-[380px] sm:h-[420px]">
                 {/* Image Display */}
                 {item.images && item.images.length > 0 ? (
                   <div className="p-4 pb-0">
@@ -1368,22 +1325,22 @@ export default function HomeInventoryPage() {
             }
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 lg:p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
                 {editingItem ? 'Edit Item' : 'Add New Item'}
               </h2>
               <button
                 onClick={resetForm}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Item Name *</label>
                 <input
@@ -1531,15 +1488,15 @@ export default function HomeInventoryPage() {
                 </label>
                 <div className="space-y-4">
                   {/* Upload Options */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* File Upload */}
                     <div className="flex items-center justify-center w-full">
-                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <svg className="w-8 h-8 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                      <label className="flex flex-col items-center justify-center w-full h-28 sm:h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-3 pb-4 sm:pt-5 sm:pb-6">
+                          <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
                             <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
                           </svg>
-                          <p className="mb-1 text-sm text-gray-500 font-semibold">Upload Files</p>
+                          <p className="mb-1 text-xs sm:text-sm text-gray-500 font-semibold">Upload Files</p>
                           <p className="text-xs text-gray-500">PNG, JPG, JPEG</p>
                         </div>
                         <input
@@ -1558,52 +1515,52 @@ export default function HomeInventoryPage() {
                       type="button"
                       onClick={startCamera}
                       disabled={imagePreviewUrls.length >= 5}
-                      className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex flex-col items-center justify-center w-full h-28 sm:h-32 border-2 border-slate-300 border-dashed rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <svg className="w-8 h-8 mb-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      <p className="mb-1 text-sm text-slate-600 font-semibold">Take Photo</p>
+                      <p className="mb-1 text-xs sm:text-sm text-slate-600 font-semibold">Take Photo</p>
                       <p className="text-xs text-slate-500">Use Camera</p>
                     </button>
                   </div>
                   
                   {/* Image Previews */}
                   {imagePreviewUrls.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
                       {imagePreviewUrls.map((url, index) => (
                         <div key={index} className="relative group">
                           <img
                             src={url}
                             alt={`Preview ${index + 1}`}
-                            className="w-full h-24 object-cover rounded-lg border border-gray-200"
+                            className="w-full h-20 sm:h-24 object-cover rounded-lg border border-gray-200"
                           />
                           <button
                             type="button"
                             onClick={() => removeImagePreview(index)}
                             disabled={deletingImageIndex === index}
-                            className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center text-xs rounded-full transition-colors ${
+                            className={`absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs rounded-full transition-colors ${
                               deletingImageIndex === index 
                                 ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100'
+                                : 'bg-red-500 hover:bg-red-600 text-white opacity-75 sm:opacity-0 sm:group-hover:opacity-100'
                             }`}
                             title={deletingImageIndex === index ? 'Deleting...' : 'Delete image'}
                           >
                             {deletingImageIndex === index ? (
-                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-2 h-2 sm:w-3 sm:h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (
                               '×'
                             )}
                           </button>
                           {/* Status indicator for existing vs new images */}
-                          <div className="absolute top-1 left-1">
+                          <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1">
                             {existingImages.includes(url) ? (
-                              <span className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded text-[10px] font-medium">
+                              <span className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-medium">
                                 Saved
                               </span>
                             ) : (
-                              <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded text-[10px] font-medium">
+                              <span className="bg-green-500 text-white text-xs px-1 py-0.5 rounded text-[9px] sm:text-[10px] font-medium">
                                 New
                               </span>
                             )}
@@ -1622,17 +1579,17 @@ export default function HomeInventoryPage() {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3">
+            <div className="flex flex-col sm:flex-row sm:justify-end space-y-3 sm:space-y-0 sm:space-x-3">
               <button
                 onClick={resetForm}
-                className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-6 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors order-2 sm:order-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={!formData.name.trim() || !formData.location.trim() || uploadingImages || deletingImageIndex !== null}
-                className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none flex items-center space-x-2"
+                className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none flex items-center justify-center space-x-2 order-1 sm:order-2"
               >
                 {uploadingImages ? (
                   <>
@@ -1670,19 +1627,19 @@ export default function HomeInventoryPage() {
             }
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 lg:p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center">
-                  <span className="text-2xl">{getCategoryIcon(detailViewItem.category)}</span>
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center">
+                  <span className="text-xl sm:text-2xl">{getCategoryIcon(detailViewItem.category)}</span>
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800">{detailViewItem.name}</h2>
-                  <p className="text-gray-600">{detailViewItem.category} • {detailViewItem.itemType}</p>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-800">{detailViewItem.name}</h2>
+                  <p className="text-sm sm:text-base text-gray-600">{detailViewItem.category} • {detailViewItem.itemType}</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getConditionColor(detailViewItem.condition)}`}>
+              <div className="flex items-center justify-between sm:space-x-3">
+                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium border ${getConditionColor(detailViewItem.condition)}`}>
                   {detailViewItem.condition.charAt(0).toUpperCase() + detailViewItem.condition.slice(1)}
                 </span>
                 <button
@@ -1690,9 +1647,9 @@ export default function HomeInventoryPage() {
                     setShowDetailView(false);
                     setDetailViewItem(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-gray-400 hover:text-gray-600 transition-colors ml-auto"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -1703,7 +1660,7 @@ export default function HomeInventoryPage() {
             {detailViewItem.images && detailViewItem.images.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Images</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                   {detailViewItem.images.map((imageUrl, index) => (
                     <div 
                       key={index} 
@@ -1731,7 +1688,6 @@ export default function HomeInventoryPage() {
                           backgroundColor: 'transparent'
                         }}
                         onError={(e) => {
-                          console.error('❌ Detail view image failed to load:', imageUrl);
                           const target = e.target as HTMLImageElement;
                           const container = target.parentElement;
                           if (container) {
@@ -1754,11 +1710,8 @@ export default function HomeInventoryPage() {
                           }
                         }}
                         onLoad={(e) => {
-                          console.log('✅ Detail view image successfully loaded:', imageUrl);
-                          const img = e.target as HTMLImageElement;
-                          console.log('Detail image dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-                          
                           // Force redraw
+                          const img = e.target as HTMLImageElement;
                           img.style.opacity = '0';
                           setTimeout(() => {
                             img.style.opacity = '1';
