@@ -59,12 +59,12 @@ export default function TaskManagement() {
       );
       setFilteredTasks(filtered);
     }
-  }, [tasks, searchQuery]);
+  }, [searchQuery, tasks]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.type || !formData.category || !formData.title) {
+
+    if (!formData.title.trim() || !formData.type.trim() || !formData.category.trim()) {
       alert('Please fill in all required fields');
       return;
     }
@@ -72,25 +72,27 @@ export default function TaskManagement() {
     try {
       if (editingTask) {
         // Update existing task
-        await updateTask(editingTask.id, formData);
-        const updatedTasks = tasks.map(task => 
-          task.id === editingTask.id 
-            ? {
-                ...task,
-                ...formData,
-                updatedAt: new Date()
-              }
-            : task
-        );
-        setTasks(updatedTasks);
+        const updates = {
+          ...formData,
+          updatedAt: new Date(),
+        };
+        await updateTask(editingTask.id, updates);
+        const updatedTask: Task = {
+          ...editingTask,
+          ...formData,
+        };
+        setTasks(prev => prev.map(task => task.id === editingTask.id ? updatedTask : task));
       } else {
-        // Create new task
-        const nextSerialNo = await getNextSerialNo();
-        const newTask = await addTask({
-          serialNo: nextSerialNo,
-          ...formData
-        });
-        setTasks([...tasks, newTask]);
+        // Add new task
+        const serialNo = await getNextSerialNo();
+        const newTask: Omit<Task, 'id'> = {
+          ...formData,
+          serialNo,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        const addedTask = await addTask(newTask);
+        setTasks(prev => [...prev, addedTask]);
       }
 
       // Reset form
@@ -109,14 +111,14 @@ export default function TaskManagement() {
     }
   };
 
-  const handleEdit = (task: Task) => {
+  const handleEdit = async (task: Task) => {
     setEditingTask(task);
     setFormData({
+      title: task.title,
       type: task.type,
       category: task.category,
       status: task.status,
-      link: task.link,
-      title: task.title
+      link: task.link || '',
     });
     setShowForm(true);
   };
@@ -147,66 +149,73 @@ export default function TaskManagement() {
 
   const getStatusBadge = (status: Task['status']) => {
     const statusStyles = {
-      'pending': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      'in-progress': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-      'completed': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-      'on-hold': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+      'pending': 'bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/50 dark:to-amber-900/50 text-yellow-800 dark:text-yellow-200 border-yellow-200/50 dark:border-yellow-700/50',
+      'in-progress': 'bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 text-blue-800 dark:text-blue-200 border-blue-200/50 dark:border-blue-700/50',
+      'completed': 'bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 text-green-800 dark:text-green-200 border-green-200/50 dark:border-green-700/50',
+      'on-hold': 'bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-900/50 dark:to-rose-900/50 text-red-800 dark:text-red-200 border-red-200/50 dark:border-red-700/50'
     };
 
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyles[status]}`}>
-        {status.replace('-', ' ').toUpperCase()}
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${statusStyles[status]}`}>
+        {status}
       </span>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-slate-900 dark:via-indigo-950 dark:to-purple-950">
+      <main className="max-w-7xl mx-auto p-6 space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-              Task Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Manage your tasks with categories, status tracking, and direct links
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Link
-              href="/"
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-            >
-              ← Back to Home
-            </Link>
-            <button
-              onClick={() => {
-                setShowForm(true);
-                setEditingTask(null);
-                setFormData({
-                  type: '',
-                  category: '',
-                  status: 'pending',
-                  link: '',
-                  title: ''
-                });
-              }}
-              className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Task
-            </button>
+        <div className="backdrop-blur-sm bg-white/60 dark:bg-gray-800/60 border border-white/40 dark:border-gray-600/40 rounded-2xl shadow-2xl p-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 sm:mb-0">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                Task Management
+              </h1>
+              <p className="text-slate-600 dark:text-slate-300 mt-2 text-lg">
+                Manage your tasks, freelance work, and study plans with modern efficiency
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <Link
+                href="/"
+                className="px-6 py-3 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 border border-white/40 dark:border-gray-600/40 text-slate-700 dark:text-slate-300 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Dashboard
+              </Link>
+              <button
+                onClick={() => {
+                  setShowForm(!showForm);
+                  if (!showForm) {
+                    setEditingTask(null);
+                    setFormData({
+                      type: '',
+                      category: '',
+                      status: 'pending',
+                      link: '',
+                      title: ''
+                    });
+                  }
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {showForm ? 'Cancel' : 'Add Task'}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 mb-6">
+        <div className="backdrop-blur-sm bg-white/60 dark:bg-gray-800/60 border border-white/40 dark:border-gray-600/40 rounded-2xl shadow-2xl p-6">
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
@@ -215,15 +224,15 @@ export default function TaskManagement() {
               placeholder="Search tasks by title, type, category, or status..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
+              className="block w-full pl-12 pr-12 py-4 rounded-xl border-0 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:focus:ring-indigo-400/50 shadow-lg transition-all duration-200 text-lg"
             />
             {searchQuery && (
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+              <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200 p-2 rounded-lg hover:bg-white/50 dark:hover:bg-gray-600/50"
                 >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -231,69 +240,85 @@ export default function TaskManagement() {
             )}
           </div>
           {searchQuery && (
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Found {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matching &ldquo;{searchQuery}&rdquo;
-            </p>
+            <div className="mt-4 p-4 rounded-xl backdrop-blur-sm bg-indigo-50/50 dark:bg-indigo-900/20 border border-indigo-200/30 dark:border-indigo-700/30">
+              <p className="text-indigo-700 dark:text-indigo-300 font-medium flex items-center gap-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Found {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} matching "{searchQuery}"
+              </p>
+            </div>
           )}
         </div>
 
         {/* Task Form */}
         {showForm && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              {editingTask ? 'Edit Task' : 'Add New Task'}
-            </h2>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div className="backdrop-blur-sm bg-white/60 dark:bg-gray-800/60 border border-white/40 dark:border-gray-600/40 rounded-2xl shadow-2xl p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/50 dark:to-indigo-800/30 rounded-xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                  {editingTask ? 'Edit Task' : 'Add New Task'}
+                </h2>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Task Title *
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 dark:bg-gray-700 dark:text-gray-100"
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-4 rounded-xl border-0 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:focus:ring-indigo-400/50 shadow-lg transition-all duration-200 text-lg"
                   placeholder="Enter task title"
                 />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Type *
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 dark:bg-gray-700 dark:text-gray-100"
-                  placeholder="e.g., Development, Design, Research"
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full px-4 py-4 rounded-xl border-0 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:focus:ring-indigo-400/50 shadow-lg transition-all duration-200 text-lg"
+                  placeholder="e.g., Study Planner, Freelance"
                 />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Category *
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 dark:bg-gray-700 dark:text-gray-100"
-                  placeholder="e.g., Frontend, Backend, UI/UX"
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="w-full px-4 py-4 rounded-xl border-0 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:focus:ring-indigo-400/50 shadow-lg transition-all duration-200 text-lg"
+                  placeholder="e.g., Study Tracker, Freelance"
                 />
               </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Status
+
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Status *
                 </label>
                 <select
+                  required
                   value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value as Task['status']})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 dark:bg-gray-700 dark:text-gray-100"
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as Task['status'] })}
+                  className="w-full px-4 py-4 rounded-xl border-0 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:focus:ring-indigo-400/50 shadow-lg transition-all duration-200 text-lg"
                 >
                   <option value="pending">Pending</option>
                   <option value="in-progress">In Progress</option>
@@ -301,34 +326,34 @@ export default function TaskManagement() {
                   <option value="on-hold">On Hold</option>
                 </select>
               </div>
-              
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+
+              <div className="md:col-span-2 space-y-3">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
                   Link (Optional)
                 </label>
                 <input
                   type="url"
                   value={formData.link}
-                  onChange={(e) => setFormData({...formData, link: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-500 dark:bg-gray-700 dark:text-gray-100"
+                  onChange={(e) => setFormData({ ...formData, link: e.target.value })}
+                  className="w-full px-4 py-4 rounded-xl border-0 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 dark:focus:ring-indigo-400/50 shadow-lg transition-all duration-200 text-lg"
                   placeholder="https://example.com"
                 />
               </div>
-              
-              <div className="md:col-span-2 flex gap-3">
+
+              <div className="md:col-span-2 flex gap-4 pt-6">
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-rose-600 text-white rounded-md hover:bg-rose-700 transition-colors"
+                  className="flex-1 px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center justify-center gap-3 text-lg"
                 >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                   {editingTask ? 'Update Task' : 'Add Task'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingTask(null);
-                  }}
-                  className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                  onClick={() => setShowForm(false)}
+                  className="px-8 py-4 backdrop-blur-sm bg-white/60 dark:bg-gray-700/60 border border-white/40 dark:border-gray-600/40 text-slate-700 dark:text-slate-300 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-lg"
                 >
                   Cancel
                 </button>
@@ -338,134 +363,133 @@ export default function TaskManagement() {
         )}
 
         {/* Tasks Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Tasks ({filteredTasks.length}{searchQuery ? ` of ${tasks.length}` : ''})
-            </h2>
+        <div className="backdrop-blur-sm bg-white/60 dark:bg-gray-800/60 border border-white/40 dark:border-gray-600/40 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-6 border-b border-white/30 dark:border-gray-600/30">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+              Task Management ({filteredTasks.length})
+            </h3>
           </div>
           
           {loading ? (
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="animate-spin h-8 w-8 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24">
+            <div className="p-12 text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/50 dark:to-indigo-800/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="animate-spin h-10 w-10 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               </div>
-              <p className="text-gray-500 dark:text-gray-400">Loading tasks...</p>
+              <p className="text-xl text-slate-600 dark:text-slate-400">Loading tasks...</p>
             </div>
           ) : filteredTasks.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <div className="p-12 text-center">
+              <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-12 h-12 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              {searchQuery ? (
-                <>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    No tasks found matching &ldquo;{searchQuery}&rdquo;
-                  </p>
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors mr-2"
-                  >
-                    Clear Search
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">No tasks found</p>
-                  <button
-                    onClick={() => setShowForm(true)}
-                    className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors"
-                  >
-                    Add Your First Task
-                  </button>
-                </>
+              <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                No tasks found
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-6">
+                {searchQuery ? 'Try adjusting your search criteria' : 'Create your first task to get started'}
+              </p>
+              {!showForm && (
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Your First Task
+                </button>
               )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+                <thead className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      S.No
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      No.
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Title
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Task Details
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Category
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Link
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-200/50 dark:divide-gray-700/50">
                   {filteredTasks.map((task) => (
-                    <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {task.serialNo}
+                    <tr
+                      key={task.id}
+                      className="hover:bg-gradient-to-r hover:from-indigo-50/30 hover:to-purple-50/30 dark:hover:from-indigo-900/20 dark:hover:to-purple-900/20 transition-all duration-200"
+                    >
+                      <td className="px-6 py-6">
+                        <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/50 dark:to-indigo-800/30 rounded-xl flex items-center justify-center">
+                          <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
+                            {task.serialNo}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                        {task.title}
+                      <td className="px-6 py-6">
+                        <div className="flex flex-col space-y-1">
+                          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                            {task.title}
+                          </div>
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/50 dark:to-green-900/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200/50 dark:border-emerald-700/50 w-fit">
+                            {task.type}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {task.type}
+                      <td className="px-6 py-6">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gradient-to-r from-blue-100 to-cyan-100 dark:from-blue-900/50 dark:to-cyan-900/50 text-blue-800 dark:text-blue-200 border border-blue-200/50 dark:border-blue-700/50">
+                          {task.category}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {task.category}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-6">
                         {getStatusBadge(task.status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {task.link ? (
-                          <a
-                            href={task.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 flex items-center gap-1"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            Open
-                          </a>
-                        ) : (
-                          <span className="text-gray-400 dark:text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
+                      <td className="px-6 py-6">
+                        <div className="flex items-center gap-3">
+                          {task.link && (
+                            <a
+                              href={task.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-3 py-2 rounded-lg backdrop-blur-sm bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-700 dark:text-indigo-300 border border-indigo-300/50 dark:border-indigo-600/50 transition-all duration-200 hover:scale-105"
+                            >
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Link
+                            </a>
+                          )}
                           <button
                             onClick={() => handleEdit(task)}
-                            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            className="inline-flex items-center px-3 py-2 rounded-lg backdrop-blur-sm bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-300/50 dark:border-amber-600/50 transition-all duration-200 hover:scale-105"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
+                            Edit
                           </button>
                           <button
                             onClick={() => handleDelete(task.id)}
-                            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            className="inline-flex items-center px-3 py-2 rounded-lg backdrop-blur-sm bg-red-500/20 hover:bg-red-500/30 text-red-700 dark:text-red-300 border border-red-300/50 dark:border-red-600/50 transition-all duration-200 hover:scale-105"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -476,7 +500,7 @@ export default function TaskManagement() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
