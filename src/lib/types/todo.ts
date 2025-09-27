@@ -14,7 +14,7 @@ export interface Todo {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'inprogress' | 'completed' | 'archived';
+  status: 'todo' | 'inprogress' | 'completed' | 'archived' | 'deleted';
   priority: 'low' | 'medium' | 'high';
   projectId: string;
   dueDate?: Date;
@@ -23,7 +23,7 @@ export interface Todo {
 }
 
 export interface TodoColumn {
-  id: 'todo' | 'inprogress' | 'completed' | 'archived';
+  id: 'todo' | 'inprogress' | 'completed' | 'archived' | 'deleted';
   title: string;
   color: string;
   count: number;

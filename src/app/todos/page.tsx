@@ -41,7 +41,8 @@ const columns: TodoColumn[] = [
   { id: 'todo', title: 'To Do', color: 'border-gray-300', count: 0 },
   { id: 'inprogress', title: 'In Progress', color: 'border-orange-300', count: 0 },
   { id: 'completed', title: 'Completed', color: 'border-green-300', count: 0 },
-  { id: 'archived', title: 'Archived', color: 'border-gray-400', count: 0 }
+  { id: 'archived', title: 'Archived', color: 'border-gray-400', count: 0 },
+  { id: 'deleted', title: 'Deleted', color: 'border-red-300', count: 0 }
 ];
 
 export default function TodoPage() {
@@ -54,6 +55,8 @@ export default function TodoPage() {
   const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingTodo, setViewingTodo] = useState<Todo | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [todoToDelete, setTodoToDelete] = useState<Todo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [draggedTodo, setDraggedTodo] = useState<Todo | null>(null);
@@ -68,7 +71,7 @@ export default function TodoPage() {
   const [todoForm, setTodoForm] = useState({
     title: '',
     description: '',
-    status: 'todo' as 'todo' | 'inprogress' | 'completed' | 'archived',
+    status: 'todo' as 'todo' | 'inprogress' | 'completed' | 'archived' | 'deleted',
     priority: 'medium' as 'low' | 'medium' | 'high',
     dueDate: ''
   });
@@ -223,7 +226,7 @@ export default function TodoPage() {
     }
   };
 
-  const handleDrop = async (e: React.DragEvent, newStatus: 'todo' | 'inprogress' | 'completed' | 'archived') => {
+  const handleDrop = async (e: React.DragEvent, newStatus: 'todo' | 'inprogress' | 'completed' | 'archived' | 'deleted') => {
     e.preventDefault();
     setDragOverColumn(null);
     
@@ -356,14 +359,53 @@ export default function TodoPage() {
     }
   };
 
-  // Delete todo
-  const handleDeleteTodo = async (todoId: string) => {
+  // Show delete confirmation
+  const handleDeleteTodo = (todo: Todo) => {
+    setTodoToDelete(todo);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // Confirm delete - move to deleted status
+  const confirmDeleteTodo = async () => {
+    if (!todoToDelete) return;
+    
+    try {
+      await updateDoc(doc(db, 'todos', todoToDelete.id), {
+        status: 'deleted',
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Todo moved to deleted!');
+      setIsDeleteConfirmOpen(false);
+      setTodoToDelete(null);
+    } catch (error) {
+      toast.error('Failed to delete todo');
+    }
+  };
+
+  // Restore todo from deleted
+  const restoreTodo = async (todoId: string) => {
+    try {
+      await updateDoc(doc(db, 'todos', todoId), {
+        status: 'todo',
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Todo restored!');
+      setIsViewModalOpen(false);
+      setViewingTodo(null);
+    } catch (error) {
+      toast.error('Failed to restore todo');
+    }
+  };
+
+  // Permanently delete todo
+  const permanentlyDeleteTodo = async (todoId: string) => {
     try {
       await deleteDoc(doc(db, 'todos', todoId));
-      toast.success('Todo deleted successfully!');
+      toast.success('Todo permanently deleted!');
+      setIsViewModalOpen(false);
+      setViewingTodo(null);
     } catch (error) {
-      console.error('Error deleting todo:', error);
-      toast.error('Failed to delete todo');
+      toast.error('Failed to permanently delete todo');
     }
   };
 
@@ -378,7 +420,8 @@ export default function TodoPage() {
     todo: filteredTodos.filter(todo => todo.status === 'todo'),
     inprogress: filteredTodos.filter(todo => todo.status === 'inprogress'),
     completed: filteredTodos.filter(todo => todo.status === 'completed'),
-    archived: filteredTodos.filter(todo => todo.status === 'archived')
+    archived: filteredTodos.filter(todo => todo.status === 'archived'),
+    deleted: filteredTodos.filter(todo => todo.status === 'deleted')
   };
 
   // Update column counts
@@ -623,7 +666,7 @@ export default function TodoPage() {
                 </div>
 
                 {/* Modern Kanban Board */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-5 gap-6">
                   {updatedColumns.map((column, index) => (
                     <div 
                       key={column.id} 
@@ -676,18 +719,26 @@ export default function TodoPage() {
                         {todosByStatus[column.id].map((todo, todoIndex) => (
                           <div
                             key={todo.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, todo)}
+                            draggable={todo.status !== 'deleted'}
+                            onDragStart={(e) => todo.status !== 'deleted' ? handleDragStart(e, todo) : e.preventDefault()}
                             onDragEnd={handleDragEnd}
                             className={`group relative ${
                               todo.status === 'archived' 
                                 ? 'bg-gray-200/60 dark:bg-gray-800/60 opacity-75' 
+                                : todo.status === 'deleted'
+                                ? 'bg-red-50/60 dark:bg-red-900/20 opacity-60' 
                                 : 'bg-white/80 dark:bg-gray-700/80'
                             } backdrop-blur-sm rounded-2xl p-5 border ${
                               todo.status === 'archived'
                                 ? 'border-gray-300/40 dark:border-gray-600/40'
+                                : todo.status === 'deleted'
+                                ? 'border-red-200/40 dark:border-red-800/40'
                                 : 'border-white/20 dark:border-gray-600/30'
-                            } hover:shadow-2xl hover:shadow-indigo-500/20 transition-all duration-300 cursor-move hover:transform hover:scale-105 select-none ${
+                            } hover:shadow-2xl ${
+                              todo.status === 'deleted' ? 'hover:shadow-red-500/20' : 'hover:shadow-indigo-500/20'
+                            } transition-all duration-300 ${
+                              todo.status === 'deleted' ? 'cursor-default' : 'cursor-move hover:transform hover:scale-105'
+                            } select-none ${
                               draggedTodo?.id === todo.id ? 'opacity-50 rotate-2 scale-105 shadow-2xl shadow-blue-500/50' : ''
                             }`}
                             onClick={(e) => {
@@ -717,32 +768,65 @@ export default function TodoPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditTodo(todo);
-                                  }}
-                                  className="p-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                  title="Edit todo"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                <div className="cursor-move p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600" title="Drag to move">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                  </svg>
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Add menu options here
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600"
-                                >
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </button>
+                                {todo.status !== 'deleted' && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditTodo(todo);
+                                      }}
+                                      className="p-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                      title="Edit todo"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </button>
+                                    <div className="cursor-move p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600" title="Drag to move">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                      </svg>
+                                    </div>
+                                  </>
+                                )}
+                                {todo.status === 'deleted' ? (
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        restoreTodo(todo.id);
+                                      }}
+                                      className="p-1 text-green-400 hover:text-green-600 dark:hover:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                                      title="Restore todo"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        permanentlyDeleteTodo(todo.id);
+                                      }}
+                                      className="p-1 text-red-400 hover:text-red-600 dark:hover:text-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                      title="Delete permanently"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // Add menu options here
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </div>
 
@@ -815,7 +899,7 @@ export default function TodoPage() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDeleteTodo(todo.id);
+                                  handleDeleteTodo(todo);
                                 }}
                                 className="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                               >
@@ -1016,13 +1100,14 @@ export default function TodoPage() {
                   </label>
                   <select
                     value={todoForm.status}
-                    onChange={(e) => setTodoForm({ ...todoForm, status: e.target.value as 'todo' | 'inprogress' | 'completed' | 'archived' })}
+                    onChange={(e) => setTodoForm({ ...todoForm, status: e.target.value as 'todo' | 'inprogress' | 'completed' | 'archived' | 'deleted' })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="todo">To Do</option>
                     <option value="inprogress">In Progress</option>
                     <option value="completed">Completed</option>
                     <option value="archived">Archived</option>
+                    <option value="deleted">Deleted</option>
                   </select>
                 </div>
 
@@ -1084,6 +1169,58 @@ export default function TodoPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {isDeleteConfirmOpen && todoToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-md w-full">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Delete Todo</h3>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">This action cannot be undone</p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-gray-700 dark:text-gray-300 mb-4">
+                Are you sure you want to delete <span className="font-semibold">"{todoToDelete.title}"</span>? 
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                The todo will be moved to the Deleted section where you can restore it later or permanently delete it.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setIsDeleteConfirmOpen(false);
+                  setTodoToDelete(null);
+                }}
+                className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteTodo}
+                className="px-6 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Move to Deleted
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* View Todo Modal */}
       {isViewModalOpen && viewingTodo && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -1105,11 +1242,13 @@ export default function TodoPage() {
                       viewingTodo.status === 'todo' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
                       viewingTodo.status === 'inprogress' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
                       viewingTodo.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                      'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
+                      viewingTodo.status === 'archived' ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400' :
+                      'bg-red-200 text-red-900 dark:bg-red-800/30 dark:text-red-300'
                     }`}>
                       {viewingTodo.status === 'todo' ? 'To Do' :
                        viewingTodo.status === 'inprogress' ? 'In Progress' :
-                       viewingTodo.status === 'completed' ? 'Completed' : 'Archived'}
+                       viewingTodo.status === 'completed' ? 'Completed' :
+                       viewingTodo.status === 'archived' ? 'Archived' : 'Deleted'}
                     </span>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                       viewingTodo.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
@@ -1216,18 +1355,42 @@ export default function TodoPage() {
               >
                 Close
               </button>
-              <button
-                onClick={() => {
-                  setIsViewModalOpen(false);
-                  openEditTodo(viewingTodo);
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Edit Todo
-              </button>
+              
+              {viewingTodo.status === 'deleted' ? (
+                <>
+                  <button
+                    onClick={() => restoreTodo(viewingTodo.id)}
+                    className="px-6 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                    Restore
+                  </button>
+                  <button
+                    onClick={() => permanentlyDeleteTodo(viewingTodo.id)}
+                    className="px-6 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Forever
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    openEditTodo(viewingTodo);
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit Todo
+                </button>
+              )}
             </div>
           </div>
         </div>
