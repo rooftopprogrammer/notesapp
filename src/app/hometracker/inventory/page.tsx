@@ -258,8 +258,21 @@ export default function HomeInventoryPage() {
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
     
+    console.log('🔍 Cloudinary Environment Check:', {
+      cloudName: cloudName ? `${cloudName.substring(0, 3)}***` : 'MISSING',
+      uploadPreset: uploadPreset ? `${uploadPreset.substring(0, 3)}***` : 'MISSING',
+      environment: process.env.NODE_ENV
+    });
+    
     if (!cloudName || !uploadPreset) {
-      throw new Error('Cloudinary configuration missing. Please set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET in your .env.local file.');
+      const missingVars = [];
+      if (!cloudName) missingVars.push('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
+      if (!uploadPreset) missingVars.push('NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET');
+      
+      const errorMessage = `❌ Cloudinary configuration missing: ${missingVars.join(', ')}. Please check your environment variables in production deployment settings.`;
+      console.error(errorMessage);
+      toast.error(`Image upload failed: Missing Cloudinary configuration`);
+      throw new Error(errorMessage);
     }
 
     const formData = new FormData();
@@ -268,6 +281,7 @@ export default function HomeInventoryPage() {
     formData.append('folder', 'home-inventory');
 
     try {
+      console.log('📤 Uploading to Cloudinary...');
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         {
@@ -277,13 +291,17 @@ export default function HomeInventoryPage() {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to upload image');
+        const errorText = await response.text();
+        console.error('❌ Cloudinary upload failed:', response.status, errorText);
+        throw new Error(`Failed to upload image: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('✅ Image uploaded successfully:', data.secure_url);
       return data.secure_url;
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('❌ Error uploading image:', error);
+      toast.error('Failed to upload image. Please try again.');
       throw error;
     }
   };

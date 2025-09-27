@@ -81,13 +81,27 @@ For local development, copy `.env.example` to `.env.local` and fill in your Fire
 cp .env.example .env.local
 ```
 
-### 📊 Monitoring & Analytics
+### � Important: Image Upload Configuration
+
+For the inventory system to work in production, you need to set up Cloudinary environment variables. See **[PRODUCTION_SETUP.md](./PRODUCTION_SETUP.md)** for detailed instructions.
+
+**Quick Setup:**
+1. Add GitHub repository secrets:
+   - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`
+   - `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`
+2. Push to master to redeploy
+
+### �📊 Monitoring & Analytics
 
 - **Firebase Console**: Monitor hosting usage and performance
 - **GitHub Actions**: View deployment status and logs
 - **PWA Features**: Offline capability and app-like experience
 
 ### 🛠️ Troubleshooting
+
+#### Image Upload Issues in Production
+- **Problem**: "Failed to upload images" error
+- **Solution**: Follow [PRODUCTION_SETUP.md](./PRODUCTION_SETUP.md) to configure Cloudinary secrets
 
 #### Build Issues
 ```bash
@@ -110,6 +124,7 @@ firebase deploy --only hosting
 
 #### GitHub Actions Issues
 - Check that `FIREBASE_SERVICE_ACCOUNT_NOTESAPP_89D19` secret is set in GitHub repository settings
+- Check that Cloudinary secrets are set: `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` and `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`
 - Verify the workflows have correct permissions
 
 ### 🔄 Future Enhancements

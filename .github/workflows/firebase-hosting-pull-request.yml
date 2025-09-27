@@ -26,6 +26,10 @@ jobs:
       
       - name: Build project
         run: npm run build
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
       
       - name: Deploy preview to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
